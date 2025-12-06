@@ -2,60 +2,313 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>auto-pop – Create Product</title>
+    <title>auto-pop dev console</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem 4rem;
+        line-height: 1.5;
+      }
+      h1,
+      h2 {
+        margin-bottom: 0.25rem;
+      }
+      section {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0;
+      }
+      input[type="text"],
+      input[type="number"] {
+        padding: 0.3rem 0.5rem;
+        width: 100%;
+        max-width: 280px;
+      }
+      input[type="file"] {
+        margin-top: 0.25rem;
+      }
+      button {
+        padding: 0.4rem 0.9rem;
+        margin-top: 0.75rem;
+        cursor: pointer;
+      }
+      pre {
+        background: #f6f6f6;
+        padding: 0.75rem;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-size: 0.85rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .col {
+        flex: 1 1 260px;
+        min-width: 0;
+      }
+      .thumb-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+      }
+      .thumb {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.8rem;
+        max-width: 180px;
+      }
+      .thumb img {
+        width: 100%;
+        height: auto;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        object-fit: cover;
+      }
+      small {
+        color: #666;
+      }
+    </style>
   </head>
   <body>
-    <h1>auto-pop – Create Product</h1>
+    <h1>auto-pop dev console</h1>
+    <p>
+      End-to-end tester for your local backend:
+      <code>/new-item</code> + <code>/generate-images</code>.
+    </p>
 
-    <form id="product-form">
-      <div>
-        <label>
-          Name:
-          <input type="text" id="name" required />
-        </label>
-      </div>
-      <div>
-        <label>
-          Price:
-          <input type="number" step="0.01" id="price" required />
-        </label>
-      </div>
-      <div>
-        <label>
-          Quantity:
-          <input type="number" id="quantity" value="1" min="1" />
-        </label>
-      </div>
-      <button type="submit">Create Product</button>
-    </form>
+    <!-- 1) Upload + create product -->
+    <section>
+      <h2>1. Upload images &amp; create Woo product</h2>
+      <small>Calls <code>POST /new-item</code></small>
 
-    <pre id="result"></pre>
+      <form id="new-item-form" enctype="multipart/form-data">
+        <div class="row">
+          <div class="col">
+            <h3>Images</h3>
+            <label>
+              Front image (required)
+              <input type="file" name="front" id="front" accept="image/*" required />
+            </label>
+            <label>
+              Back image (required)
+              <input type="file" name="back" id="back" accept="image/*" required />
+            </label>
+            <label>
+              Tag image (optional)
+              <input type="file" name="tag" id="tag" accept="image/*" />
+            </label>
+          </div>
+
+          <div class="col">
+            <h3>Product details</h3>
+            <label>
+              Name
+              <input type="text" name="name" id="name" required />
+            </label>
+            <label>
+              Price
+              <input
+                type="number"
+                step="0.01"
+                name="price"
+                id="price"
+                required
+              />
+            </label>
+            <label>
+              Quantity
+              <input
+                type="number"
+                name="quantity"
+                id="quantity"
+                value="1"
+                min="1"
+              />
+            </label>
+
+            <button type="submit" id="create-btn">Create draft product</button>
+          </div>
+        </div>
+      </form>
+
+      <h3>Response from /new-item</h3>
+      <pre id="new-item-result">Submit the form above to see response...</pre>
+
+      <h3>Saved filenames (for AI)</h3>
+      <pre id="filenames">front: -
+back: -</pre>
+    </section>
+
+    <!-- 2) Generate AI images -->
+    <section>
+      <h2>2. Generate on-model &amp; ghost images</h2>
+      <small>Calls <code>POST /generate-images</code></small>
+
+      <p>
+        This uses the last saved <code>front</code> and
+        <code>back</code> filenames from step 1.
+      </p>
+
+      <button id="generate-images-btn" disabled>Generate images</button>
+
+      <h3>Raw response</h3>
+      <pre id="generate-images-raw">Call /generate-images to see response...</pre>
+
+      <h3>Rendered images</h3>
+      <div id="generated-images" class="thumb-grid">
+        <!-- thumbnails will be injected here -->
+      </div>
+      <small>
+        Note: right now <code>imageGenClient.js</code> returns placeholder
+        URLs (example.com), so the images may not actually load until you plug
+        in a real AI provider.
+      </small>
+    </section>
 
     <script>
-      const form = document.getElementById("product-form");
-      const resultEl = document.getElementById("result");
+      const newItemForm = document.getElementById("new-item-form");
+      const newItemResultEl = document.getElementById("new-item-result");
+      const filenamesEl = document.getElementById("filenames");
+      const createBtn = document.getElementById("create-btn");
 
-      form.addEventListener("submit", async (e) => {
+      const generateBtn = document.getElementById("generate-images-btn");
+      const genRawEl = document.getElementById("generate-images-raw");
+      const genImagesContainer = document.getElementById("generated-images");
+
+      let lastFrontFilename = null;
+      let lastBackFilename = null;
+
+      // 1) Handle /new-item form submission
+      newItemForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-        resultEl.textContent = "Creating...";
+        newItemResultEl.textContent =
+          "Uploading images and creating Woo product...";
+        createBtn.disabled = true;
 
-        const name = document.getElementById("name").value;
-        const price = document.getElementById("price").value;
-        const quantity = document.getElementById("quantity").value || 1;
+        const formData = new FormData(newItemForm);
 
         try {
-          const res = await fetch("/products", {
+          const res = await fetch("/new-item", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            newItemResultEl.textContent =
+              "Error:\n" + JSON.stringify(data, null, 2);
+            createBtn.disabled = false;
+            return;
+          }
+
+          newItemResultEl.textContent = JSON.stringify(data, null, 2);
+
+          // store filenames for later
+          lastFrontFilename = data.images?.front || null;
+          lastBackFilename = data.images?.back || null;
+
+          filenamesEl.textContent = `front: ${
+            lastFrontFilename || "-"
+          }\nback: ${lastBackFilename || "-"}`;
+
+          // enable generate button if we have both
+          generateBtn.disabled = !(lastFrontFilename && lastBackFilename);
+        } catch (err) {
+          console.error(err);
+          newItemResultEl.textContent = "Error: " + err.message;
+        } finally {
+          createBtn.disabled = false;
+        }
+      });
+
+      // 2) Handle /generate-images
+      generateBtn.addEventListener("click", async () => {
+        if (!lastFrontFilename || !lastBackFilename) {
+          alert("No front/back filenames available yet.");
+          return;
+        }
+
+        generateBtn.disabled = true;
+        generateBtn.textContent = "Generating...";
+
+        genRawEl.textContent = "Calling /generate-images...";
+        genImagesContainer.innerHTML = "";
+
+        try {
+          const res = await fetch("/generate-images", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ name, price, quantity }),
+            body: JSON.stringify({
+              frontFilename: lastFrontFilename,
+              backFilename: lastBackFilename,
+            }),
           });
 
           const data = await res.json();
-          resultEl.textContent = JSON.stringify(data, null, 2);
+
+          if (!res.ok) {
+            genRawEl.textContent =
+              "Error:\n" + JSON.stringify(data, null, 2);
+            return;
+          }
+
+          genRawEl.textContent = JSON.stringify(data, null, 2);
+
+          // render thumbnails if any URLs are returned
+          genImagesContainer.innerHTML = "";
+          const onModel = data.onModel || [];
+          const ghost = data.ghost || [];
+
+          onModel.forEach((img, idx) => {
+            const div = document.createElement("div");
+            div.className = "thumb";
+            const imageEl = document.createElement("img");
+            imageEl.src = img.url;
+            imageEl.alt = `On-model ${idx + 1}`;
+
+            const label = document.createElement("div");
+            label.textContent = `On-model ${idx + 1}`;
+
+            div.appendChild(imageEl);
+            div.appendChild(label);
+            genImagesContainer.appendChild(div);
+          });
+
+          ghost.forEach((img, idx) => {
+            const div = document.createElement("div");
+            div.className = "thumb";
+            const imageEl = document.createElement("img");
+            imageEl.src = img.url;
+            imageEl.alt = `Ghost ${idx + 1}`;
+
+            const label = document.createElement("div");
+            label.textContent = `Ghost ${idx + 1}`;
+
+            div.appendChild(imageEl);
+            div.appendChild(label);
+            genImagesContainer.appendChild(div);
+          });
         } catch (err) {
-          resultEl.textContent = "Error: " + err.message;
+          console.error(err);
+          genRawEl.textContent = "Error: " + err.message;
+        } finally {
+          generateBtn.disabled = false;
+          generateBtn.textContent = "Generate images";
         }
       });
     </script>
