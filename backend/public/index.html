@@ -27,13 +27,17 @@
         margin: 0.5rem 0;
       }
       input[type="text"],
-      input[type="number"] {
+      input[type="number"],
+      textarea {
         padding: 0.3rem 0.5rem;
         width: 100%;
         max-width: 280px;
       }
       input[type="file"] {
         margin-top: 0.25rem;
+      }
+      textarea {
+        max-width: 100%;
       }
       button {
         padding: 0.4rem 0.9rem;
@@ -85,7 +89,8 @@
     <h1>auto-pop dev console</h1>
     <p>
       End-to-end tester for your local backend:
-      <code>/new-item</code> + <code>/generate-images</code>.
+      <code>/new-item</code>, <code>/analyze-tag</code>,
+      <code>/generate-images</code>, and <code>/generate-copy</code>.
     </p>
 
     <!-- 1) Upload + create product -->
@@ -99,14 +104,14 @@
             <h3>Images</h3>
             <label>
               Front image (required)
-              <input type="file" name="front" id="front" accept="image/*" required />
+              <input type="file" name="front" id="front" accept="image/*" />
             </label>
             <label>
               Back image (required)
-              <input type="file" name="back" id="back" accept="image/*" required />
+              <input type="file" name="back" id="back" accept="image/*" />
             </label>
             <label>
-              Tag image (optional)
+              Tag image (optional, used for OCR)
               <input type="file" name="tag" id="tag" accept="image/*" />
             </label>
           </div>
@@ -148,7 +153,14 @@
 
       <h3>Saved filenames (for AI)</h3>
       <pre id="filenames">front: -
-back: -</pre>
+back: -
+tag: -</pre>
+
+      <!-- OCR can run before or after product creation -->
+      <button id="analyze-tag-btn">Analyze tag image (OCR)</button>
+
+      <h3>Tag OCR result</h3>
+      <pre id="tag-ocr-result">Tag OCR not run yet.</pre>
     </section>
 
     <!-- 2) Generate AI images -->
@@ -167,14 +179,61 @@ back: -</pre>
       <pre id="generate-images-raw">Call /generate-images to see response...</pre>
 
       <h3>Rendered images</h3>
-      <div id="generated-images" class="thumb-grid">
-        <!-- thumbnails will be injected here -->
-      </div>
+      <div id="generated-images" class="thumb-grid"></div>
       <small>
-        Note: right now <code>imageGenClient.js</code> returns placeholder
-        URLs (example.com), so the images may not actually load until you plug
-        in a real AI provider.
+        Note: depending on your <code>imageGenClient.js</code> config, these may
+        be Claid sample garments until you wire real garment URLs.
       </small>
+    </section>
+
+    <!-- 3) Generate product copy -->
+    <section>
+      <h2>3. Generate product copy</h2>
+      <small>Calls <code>POST /generate-copy</code></small>
+
+      <form id="copy-form">
+        <div class="row">
+          <div class="col">
+            <h3>Inputs</h3>
+            <label>
+              Product type (e.g. "unisex heavyweight hoodie")
+              <input type="text" id="copy-product-type" />
+            </label>
+            <label>
+              Brand (optional)
+              <input type="text" id="copy-brand" />
+            </label>
+            <label>
+              Style notes (optional)
+              <input
+                type="text"
+                id="copy-style-notes"
+                placeholder="oversized fit, streetwear, etc."
+              />
+            </label>
+          </div>
+
+          <div class="col">
+            <h3>Tag text</h3>
+            <label>
+              Raw tag text / garment info
+              <textarea
+                id="copy-tag-text"
+                rows="6"
+                placeholder="Paste tag text here or use 'Analyze tag' above to autofill..."
+              ></textarea>
+            </label>
+
+            <button type="submit" id="copy-btn">Generate copy</button>
+          </div>
+        </div>
+      </form>
+
+      <h3>Copy output</h3>
+      <pre id="copy-raw">Fill the form above to generate copy...</pre>
+
+      <h3>Preview</h3>
+      <div id="copy-preview"></div>
     </section>
 
     <script>
@@ -187,8 +246,26 @@ back: -</pre>
       const genRawEl = document.getElementById("generate-images-raw");
       const genImagesContainer = document.getElementById("generated-images");
 
+      const analyzeTagBtn = document.getElementById("analyze-tag-btn");
+      const tagOcrResultEl = document.getElementById("tag-ocr-result");
+
+      const nameInput = document.getElementById("name");
+      const priceInput = document.getElementById("price");
+      const tagInput = document.getElementById("tag");
+
+      // Copy generation elements
+      const copyForm = document.getElementById("copy-form");
+      const copyBtn = document.getElementById("copy-btn");
+      const copyTagTextEl = document.getElementById("copy-tag-text");
+      const copyProductTypeEl = document.getElementById("copy-product-type");
+      const copyBrandEl = document.getElementById("copy-brand");
+      const copyStyleNotesEl = document.getElementById("copy-style-notes");
+      const copyRawEl = document.getElementById("copy-raw");
+      const copyPreviewEl = document.getElementById("copy-preview");
+
       let lastFrontFilename = null;
       let lastBackFilename = null;
+      let lastTagFilename = null;
 
       // 1) Handle /new-item form submission
       newItemForm.addEventListener("submit", async (e) => {
@@ -219,12 +296,13 @@ back: -</pre>
           // store filenames for later
           lastFrontFilename = data.images?.front || null;
           lastBackFilename = data.images?.back || null;
+          lastTagFilename = data.images?.tag || null;
 
           filenamesEl.textContent = `front: ${
             lastFrontFilename || "-"
-          }\nback: ${lastBackFilename || "-"}`;
+          }\nback: ${lastBackFilename || "-"}\ntag: ${lastTagFilename || "-"}`;
 
-          // enable generate button if we have both
+          // enable generate-images button if we have both front+back
           generateBtn.disabled = !(lastFrontFilename && lastBackFilename);
         } catch (err) {
           console.error(err);
@@ -269,7 +347,6 @@ back: -</pre>
 
           genRawEl.textContent = JSON.stringify(data, null, 2);
 
-          // render thumbnails if any URLs are returned
           genImagesContainer.innerHTML = "";
           const onModel = data.onModel || [];
           const ghost = data.ghost || [];
@@ -311,6 +388,189 @@ back: -</pre>
           generateBtn.textContent = "Generate images";
         }
       });
+
+      // 2b) Handle OCR: either use existing saved filename OR upload tag now
+      analyzeTagBtn.addEventListener("click", async () => {
+        const hasSavedTag = !!lastTagFilename;
+        const tagFile = tagInput.files && tagInput.files[0];
+
+        if (!hasSavedTag && !tagFile) {
+          alert("Please select a tag image first.");
+          return;
+        }
+
+        analyzeTagBtn.disabled = true;
+        analyzeTagBtn.textContent = "Analyzing tag...";
+        tagOcrResultEl.textContent = "Running OCR on tag image...";
+
+        try {
+          let data;
+
+          if (hasSavedTag) {
+            // Call /analyze-tag by filename
+            const res = await fetch("/analyze-tag", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ tagFilename: lastTagFilename }),
+            });
+            data = await res.json();
+            if (!res.ok) {
+              tagOcrResultEl.textContent =
+                "Error:\n" + JSON.stringify(data, null, 2);
+              return;
+            }
+          } else {
+            // Upload tag directly to /analyze-tag-upload
+            const formData = new FormData();
+            formData.append("tag", tagFile);
+
+            const res = await fetch("/analyze-tag-upload", {
+              method: "POST",
+              body: formData,
+            });
+            data = await res.json();
+            if (!res.ok) {
+              tagOcrResultEl.textContent =
+                "Error:\n" + JSON.stringify(data, null, 2);
+              return;
+            }
+
+            // Save the filename returned by the server
+            if (data.tagFilename) {
+              lastTagFilename = data.tagFilename;
+              filenamesEl.textContent = `front: ${
+                lastFrontFilename || "-"
+              }\nback: ${lastBackFilename || "-"}\ntag: ${lastTagFilename || "-"}`;
+            }
+          }
+
+          // Show raw OCR text
+          tagOcrResultEl.textContent = data.rawText || "(no text detected)";
+
+          // Autofill tag text into copy generator
+          if (data.rawText) {
+            copyTagTextEl.value = data.rawText;
+          }
+
+          // Use parsed metadata (brand, productType, price) to fill fields
+          if (data.parsed) {
+            const parsed = data.parsed;
+
+            // Fill Step 3 fields (copy generator)
+            if (parsed.productType) {
+              copyProductTypeEl.value = parsed.productType;
+            }
+            if (parsed.brand) {
+              copyBrandEl.value = parsed.brand;
+            }
+
+            // Suggest a product name for Woo: "Brand ProductType"
+            if (parsed.productType || parsed.brand) {
+              const suggestedName = `${parsed.brand || ""} ${
+                parsed.productType || ""
+              }`.trim();
+              if (suggestedName && !nameInput.value) {
+                nameInput.value = suggestedName;
+              }
+            }
+
+            // Fill price if parsed and empty
+            if (parsed.price && !priceInput.value) {
+              priceInput.value = parsed.price;
+            }
+          }
+        } catch (err) {
+          console.error(err);
+          tagOcrResultEl.textContent = "Error: " + err.message;
+        } finally {
+          analyzeTagBtn.disabled = false;
+          analyzeTagBtn.textContent = "Analyze tag image (OCR)";
+        }
+      });
+
+      // 3) Handle /generate-copy submissions
+      copyForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        copyBtn.disabled = true;
+        copyBtn.textContent = "Generating...";
+
+        copyRawEl.textContent = "Calling /generate-copy...";
+        copyPreviewEl.innerHTML = "";
+
+        const payload = {
+          tagText: copyTagTextEl.value || "",
+          productType: copyProductTypeEl.value || "",
+          brand: copyBrandEl.value || "",
+          styleNotes: copyStyleNotesEl.value || "",
+        };
+
+        try {
+          const res = await fetch("/generate-copy", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            copyRawEl.textContent =
+              "Error:\n" + JSON.stringify(data, null, 2);
+            return;
+          }
+
+          copyRawEl.textContent = JSON.stringify(data, null, 2);
+
+          const title = data.title || "(no title)";
+          const subtitle = data.subtitle || "";
+          const description = data.description || "";
+          const bullets = Array.isArray(data.bullets) ? data.bullets : [];
+          const seo = Array.isArray(data.seo_keywords)
+            ? data.seo_keywords
+            : [];
+
+          let html = "";
+          html += `<h3>${escapeHtml(title)}</h3>`;
+          if (subtitle) {
+            html += `<p><em>${escapeHtml(subtitle)}</em></p>`;
+          }
+          if (description) {
+            html += `<p>${escapeHtml(description)}</p>`;
+          }
+          if (bullets.length) {
+            html += "<ul>";
+            for (const b of bullets) {
+              html += `<li>${escapeHtml(b)}</li>`;
+            }
+            html += "</ul>";
+          }
+          if (seo.length) {
+            html += `<p><strong>SEO keywords:</strong> ${seo
+              .map(escapeHtml)
+              .join(", ")}</p>`;
+          }
+
+          copyPreviewEl.innerHTML = html || "<p>No copy generated.</p>";
+        } catch (err) {
+          console.error(err);
+          copyRawEl.textContent = "Error: " + err.message;
+        } finally {
+          copyBtn.disabled = false;
+          copyBtn.textContent = "Generate copy";
+        }
+      });
+
+      // Helper: basic HTML escaping
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
     </script>
   </body>
 </html>

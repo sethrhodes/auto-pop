@@ -1,53 +1,103 @@
+// backend/ocrClient.js
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const FormData = require("form-data");
+const sharp = require("sharp");
 require("dotenv").config();
 
-// This function expects a filename that exists in backend/uploads/
-async function extractTextFromTag(filename) {
-  const ocrEndpoint = process.env.OCR_API_URL;  // e.g. https://api.ocr-provider.com/parse/image
-  const ocrApiKey = process.env.OCR_API_KEY;    // whatever your provider uses
+const OCR_API_URL =
+  process.env.OCR_API_URL || "https://api.ocr.space/parse/image";
+const OCR_API_KEY = process.env.OCR_API_KEY;
 
-  if (!ocrEndpoint || !ocrApiKey) {
-    throw new Error("OCR_API_URL and OCR_API_KEY must be set in .env");
+const MAX_OCR_SIZE_BYTES = 1024 * 1024; // 1 MB
+
+/**
+ * Use OCR.Space to extract text from a saved tag image.
+ *
+ * Returns:
+ * {
+ *   rawText: "full text from tag",
+ *   lines: ["line 1", "line 2", ...],
+ *   ocr: { ...full OCR response... }
+ * }
+ */
+async function extractTagText({ tagFilename }) {
+  if (!OCR_API_KEY) {
+    throw new Error("OCR_API_KEY must be set in backend/.env");
   }
 
-  const filePath = path.join(__dirname, "uploads", filename);
+  if (!tagFilename) {
+    throw new Error("tagFilename is required");
+  }
 
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Tag file not found: ${filePath}`);
+  const tagPath = path.join(__dirname, "uploads", tagFilename);
+  if (!fs.existsSync(tagPath)) {
+    throw new Error(`Tag image not found at: ${tagPath}`);
+  }
+
+  // Decide which file to send (original or compressed)
+  let fileToSendPath = tagPath;
+  const { size } = fs.statSync(tagPath);
+
+  if (size > MAX_OCR_SIZE_BYTES) {
+    console.log(
+      `Tag image is ${size} bytes (>1MB). Compressing before OCR...`
+    );
+
+    const compressedName = `ocr-${Date.now()}-${tagFilename}.jpg`;
+    const compressedPath = path.join(__dirname, "uploads", compressedName);
+
+    // Simple strategy: resize to max width ~1200px, JPEG quality 70
+    await sharp(tagPath)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .jpeg({ quality: 70 })
+      .toFile(compressedPath);
+
+    const { size: newSize } = fs.statSync(compressedPath);
+    console.log(`Compressed tag image to ${newSize} bytes: ${compressedPath}`);
+
+    fileToSendPath = compressedPath;
   }
 
   const form = new FormData();
-  form.append("file", fs.createReadStream(filePath));
+  form.append("file", fs.createReadStream(fileToSendPath));
+  form.append("apikey", OCR_API_KEY);
+  form.append("language", "eng");
+  form.append("isOverlayRequired", "false");
 
-  // NOTE:
-  // Each OCR provider has its own fields. For now, we'll use generic "file"
-  // and "apikey" as an example. Adjust these once you pick a real service.
-  form.append("apikey", ocrApiKey);
-
-  const response = await axios.post(ocrEndpoint, form, {
-    headers: {
-      ...form.getHeaders(),
-    },
-    // some APIs use query params instead of body fields:
-    // params: { apikey: ocrApiKey },
+  const res = await axios.post(OCR_API_URL, form, {
+    headers: form.getHeaders(),
   });
 
-  // Adjust this parsing based on the real provider's response shape.
-  // For now we'll assume it returns something like { text: "..." }
-  const data = response.data;
+  const body = res.data;
 
-  // TODO: customize based on your real API
-  if (data.text) {
-    return data.text;
+  if (body.IsErroredOnProcessing) {
+    const msg =
+      (Array.isArray(body.ErrorMessage)
+        ? body.ErrorMessage.join("; ")
+        : body.ErrorMessage) || "Unknown OCR error";
+    throw new Error(`OCR.Space error: ${msg}`);
   }
 
-  // fallback: just return the whole response so you can inspect it
-  return JSON.stringify(data);
+  const parsedResults = body.ParsedResults || [];
+  const text = parsedResults
+    .map((r) => r.ParsedText || "")
+    .join("\n\n")
+    .trim();
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  return {
+    rawText: text,
+    lines,
+    ocr: body,
+  };
 }
 
 module.exports = {
-  extractTextFromTag,
+  extractTagText,
 };
