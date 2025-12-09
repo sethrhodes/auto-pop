@@ -2,147 +2,215 @@
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
+const FormData = require("form-data");
 require("dotenv").config();
 
 const IMAGE_API_URL =
   process.env.IMAGE_API_URL || "https://api.claid.ai/v1/image/ai-fashion-models";
 const IMAGE_API_KEY = process.env.IMAGE_API_KEY;
 
-// Small helper to sleep between polling attempts
+
+// Helper to sleep
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Call Claid AI Fashion Models and return 2 on-model + 2 "ghost" image URLs.
- *
- * NOTE (for now):
- *  - We ignore the local front/back files and use Claid's sample clothing URL
- *    just to prove the integration + credits are working.
- *  - Once we set up public hosting (e.g. S3 or Claid Web Folder), we’ll swap
- *    in real URLs for the uploaded garment images.
+ * Upload a local file to Claid to get a temporary public URL.
+ * We use a minimal "resize" op or similar to trigger the upload flow.
  */
-async function generateOnModelAndGhost({ frontFilename, backFilename }) {
+async function uploadToClaid(filePath) {
+  const form = new FormData();
+  form.append("file", fs.createReadStream(filePath));
+  // Minimal config to just get the file uploaded and returned
+  form.append(
+    "data",
+    JSON.stringify({
+      operations: {
+        // No-op or minimal op: re-encode to jpeg partial quality? 
+        // Or just resize to same width? Let's just do a dummy logic via 'smart_height' or similar defaults.
+        // Actually, Claid requires at least one op usually.
+        // Let's rely on simple 'restoration' or just 'resize'.
+        // "Ghost" improvements: Remove background + Center/Pad
+        // "Ghost" improvements: Remove background + Standardize size
+        resizing: { width: 1500, height: 2000, fit: "bounds" },
+        background: { remove: true },
+      },
+    })
+  );
+
+  // Use upload endpoint for multipart/form-data
+  const uploadUrl = "https://api.claid.ai/v1/image/edit/upload";
+
+  console.log("Uploading to Claid:", filePath);
+
+  const res = await axios.post(uploadUrl, form, {
+    headers: {
+      ...form.getHeaders(),
+      Authorization: `Bearer ${IMAGE_API_KEY}`,
+    },
+    validateStatus: () => true, // Don't throw on error status
+  });
+
+  if (res.status >= 400) {
+    console.error("Claid Upload Error:", JSON.stringify(res.data, null, 2));
+    throw new Error(`Claid Upload Failed: ${res.status} ${res.statusText}`);
+  }
+
+  const tmpUrl = res.data?.data?.output?.tmp_url;
+  if (!tmpUrl) {
+    throw new Error("Failed to get tmp_url from Claid upload");
+  }
+
+  console.log("Got temp URL:", tmpUrl);
+  return tmpUrl;
+}
+
+/**
+ * Helper to start a Claid generation task with retries for 429
+ */
+async function triggerClaidGeneration(taskId, imageUrl, pose) {
+  const payload = {
+    input: {
+      clothing: [imageUrl] // Send only the specific side
+    },
+    options: {
+      pose: pose,
+      background: "minimalistic studio background, ecommerce product photography, soft even lighting",
+    },
+  };
+
+  const maxRetries = 3;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      console.log(`[${taskId}] Triggering Claid generation (attempt ${attempt + 1})...`);
+      const res = await axios.post(IMAGE_API_URL, payload, {
+        headers: {
+          Authorization: `Bearer ${IMAGE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const task = res.data?.data;
+      if (!task || !task.result_url) {
+        throw new Error(`[${taskId}] Claid response missing result_url`);
+      }
+      return task;
+
+    } catch (err) {
+      if (err.response && err.response.status === 429) {
+        console.warn(`[${taskId}] Rate limited (429). Retrying in 5s...`);
+        await sleep(5000 * (attempt + 1)); // Backoff: 5s, 10s, 15s
+        attempt++;
+      } else {
+        throw err; // Rethrow other errors
+      }
+    }
+  }
+  throw new Error(`[${taskId}] Failed after ${maxRetries} retries (Rate Limit)`);
+}
+
+/**
+ * Poll a single Claid task until completion
+ */
+async function pollClaidTask(taskId, resultUrl) {
+  const maxAttempts = 20;
+  const delayMs = 3000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await sleep(delayMs);
+
+    const res = await axios.get(resultUrl, {
+      headers: { Authorization: `Bearer ${IMAGE_API_KEY}` },
+    });
+
+    const status = res.data?.data?.status;
+    console.log(`[${taskId}] Poll attempt ${attempt}: ${status}`);
+
+    if (status === "DONE") {
+      const output = res.data?.data?.result?.output_objects?.[0];
+      const url = output?.tmp_url || output?.claid_storage_uri;
+      if (!url) throw new Error(`[${taskId}] DONE but no output URL`);
+      return url;
+    }
+
+    if (status === "ERROR") {
+      const errs = JSON.stringify(res.data?.data?.errors || []);
+      throw new Error(`[${taskId}] Failed: ${errs}`);
+    }
+  }
+  throw new Error(`[${taskId}] Timed out`);
+}
+
+async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "female" }) {
   if (!IMAGE_API_KEY) {
     throw new Error("IMAGE_API_KEY must be set in backend/.env");
   }
 
-  // Sanity check that the files exist on disk (even though we don’t send them yet)
   const frontPath = path.join(__dirname, "uploads", frontFilename);
   const backPath = path.join(__dirname, "uploads", backFilename);
 
-  if (!fs.existsSync(frontPath)) {
-    throw new Error(`Front image not found at: ${frontPath}`);
-  }
-  if (!fs.existsSync(backPath)) {
-    throw new Error(`Back image not found at: ${backPath}`);
-  }
+  if (!fs.existsSync(frontPath)) throw new Error(`Front not found: ${frontPath}`);
+  if (!fs.existsSync(backPath)) throw new Error(`Back not found: ${backPath}`);
 
-  // 🔹 For this FIRST TEST we use Claid's sample clothing URL so their servers
-  // can reach it (your localhost images are not reachable from the internet).
-  const clothingUrls = [
-    "https://images.claid.ai/photoshoot-templates/assets/images/b63641ea19dd4dac8fdc02a6195873f0.jpeg",
-  ];
+  // 1. Upload both images (Ghost Images = These Uploads, roughly)
+  // Ideally, we would run a "Remove Background" op here for true ghost mannequin,
+  // but for now we return the uploaded "temporary" URLs which are accessible.
+  // Note: These Claid temp URLs expire in 24h, which is fine for this session.
+  const [frontUrl, backUrl] = await Promise.all([
+    uploadToClaid(frontPath),
+    uploadToClaid(backPath),
+  ]);
 
-  const payload = {
-    input: {
-      clothing: clothingUrls,
-    },
-    options: {
-      pose: "full body, front view, neutral stance, arms relaxed",
-      background:
-        "minimalistic studio background, ecommerce product photography, soft even lighting",
-      // You can add more options later from:
-      // https://docs.claid.ai/ai-fashion-models-api/ai-fashion-models-options
-    },
-  };
+  console.log("Uploaded Ghost/Source URLs:", { frontUrl, backUrl });
 
-  console.log("Calling Claid AI Fashion Models...");
+  // Determine model terms based on gender "Men" -> "male model", "Women" -> "female model"
+  const modelTerm = gender && gender.toLowerCase().includes("men") ? "male model" : "female model";
 
-  // 1) Kick off async generation
-  const startRes = await axios.post(IMAGE_API_URL, payload, {
-    headers: {
-      Authorization: `Bearer ${IMAGE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const task = startRes.data?.data;
-  if (!task || !task.result_url) {
-    console.error("Unexpected Claid response:", startRes.data);
-    throw new Error("Claid response missing data.result_url");
-  }
-
-  console.log("Claid task accepted:", {
-    id: task.id,
-    status: task.status,
-    result_url: task.result_url,
-  });
-
-  // 2) Poll result_url until status === DONE
-  const maxAttempts = 15; // ~30 seconds if delayMs = 2000
-  const delayMs = 2000;
-  let lastStatus = task.status;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const res = await axios.get(task.result_url, {
-      headers: {
-        Authorization: `Bearer ${IMAGE_API_KEY}`,
-      },
-    });
-
-    const body = res.data;
-    const data = body?.data;
-    const status = data?.status;
-
-    console.log(`Claid poll attempt ${attempt}, status: ${status}`);
-
-    if (status === "DONE") {
-      const outputObjects = data?.result?.output_objects || [];
-
-      // Extract URLs (tmp_url is a temporary direct URL)  [oai_citation:2‡docs.claid.ai](https://docs.claid.ai/ai-fashion-models-api/async-api-reference)
-      const urls = outputObjects
-        .map((obj) => obj.tmp_url || obj.claid_storage_uri || null)
-        .filter(Boolean);
-
-      if (!urls.length) {
-        throw new Error("Claid DONE but no output URLs found");
-      }
-
-      // Map into 2 on-model + 2 ghost slots
-      const onModel = urls.slice(0, 2).map((url) => ({ url }));
-
-      let ghost = urls.slice(2, 4).map((url) => ({ url }));
-      // If not enough distinct ghost images, repeat from the start
-      while (ghost.length < 2 && urls.length > 0) {
-        ghost.push({ url: urls[0] });
-      }
-
-      return { onModel, ghost };
-    }
-
-    if (status === "ERROR") {
-      console.error("Claid returned ERROR:", data?.errors);
-      throw new Error(
-        "Claid reported ERROR: " + JSON.stringify(data?.errors || [])
-      );
-    }
-
-    lastStatus = status;
-
-    if (attempt === maxAttempts) {
-      throw new Error(
-        `Timed out waiting for Claid result. Last status: ${lastStatus}`
-      );
-    }
-
-    await sleep(delayMs);
-  }
-
-  // Should never get here
-  throw new Error(
-    `Failed to get Claid result after ${maxAttempts} attempts (last status: ${lastStatus})`
+  // 2. Trigger Sequential Model Generations (4 Shots)
+  // Shot 1: Front Close Up (Waist to Neck/Chin - Detail Focus)
+  const task1 = await triggerClaidGeneration(
+    "SHOT_1",
+    frontUrl,
+    `detail fashion shot of ${modelTerm}, cropped from waist to chin, headless or cropped at neck, front view, focus on clothing fabric and design, neutral background, studio lighting`
   );
+  const url1 = await pollClaidTask("SHOT_1", task1.result_url);
+
+  // Shot 2: Back Close Up (Waist to Head) - Matches Shot 1 style
+  const task2 = await triggerClaidGeneration(
+    "SHOT_2",
+    backUrl,
+    `medium close up portrait of ${modelTerm}, cropped from waist to top of head, back view, neutral background, studio lighting`
+  );
+  const url2 = await pollClaidTask("SHOT_2", task2.result_url);
+
+  // Shot 3: Lifestyle 1 (Beach Sitting)
+  const task3 = await triggerClaidGeneration(
+    "SHOT_3",
+    frontUrl,
+    `lifestyle photography of single ${modelTerm} sitting on sand on a calm beach, one person only, no collage, no split screen, centered subject, sunny day, ocean in background, wearing the clothing, natural lighting`
+  );
+  const url3 = await pollClaidTask("SHOT_3", task3.result_url);
+
+  // Shot 4: Lifestyle 2 (Urban Strut/Walking)
+  const task4 = await triggerClaidGeneration(
+    "SHOT_4",
+    frontUrl,
+    `lifestyle photography of single ${modelTerm} walking on a city street, urban setting, soft blurred background, one person only, no collage, full body shot, wearing the clothing, natural daylight`
+  );
+  const url4 = await pollClaidTask("SHOT_4", task4.result_url);
+
+  // 4. Return formatted results as a "Gallery"
+  return {
+    gallery: [
+      { label: "Front Detail", url: url1 }, // url1 is Front Close Up
+      { label: "Back Detail", url: url2 },
+      { label: "Beach Lifestyle", url: url3 },
+      { label: "Urban Lifestyle", url: url4 }
+    ]
+  };
 }
 
 module.exports = {

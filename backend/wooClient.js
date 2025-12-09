@@ -42,7 +42,7 @@ async function createTestProduct() {
 }
 
 // New: generic product creator that uses data from the request
-async function createProduct({ name, price, quantity = 1 }) {
+async function createProduct({ name, price, quantity = 1, description, short_description }) {
   const baseURL = process.env.WC_BASE_URL;
   const consumerKey = process.env.WC_CONSUMER_KEY;
   const consumerSecret = process.env.WC_CONSUMER_SECRET;
@@ -51,6 +51,8 @@ async function createProduct({ name, price, quantity = 1 }) {
     name,
     type: "simple",
     regular_price: String(price),
+    description: description || "",
+    short_description: short_description || "",
     status: "draft",
     manage_stock: true,
     stock_quantity: quantity,

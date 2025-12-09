@@ -10,8 +10,32 @@ function parseTagMetadata(rawText = "") {
   const brandLine =
     lines.find((l) => l.toLowerCase().includes("surf shop")) || "";
 
-  // Price: first $xx.xx looking thing
-  const priceMatch = rawText.match(/\$?\s?(\d{1,3}(?:\.\d{2})?)/);
+  // Price: Look for explicit prices with $ sign first, from bottom up
+  // Regex matches: $12.34, $ 12.34, 12.34 (if loose), $12
+  // We reverse lines to find the "final" price often at the bottom
+  const reverseLines = [...lines].reverse();
+
+  // 1. Strict match with $ symbol
+  let priceMatch = null;
+  for (const line of reverseLines) {
+    const match = line.match(/\$\s?(\d{1,4}(?:\.\d{2})?)/);
+    if (match) {
+      priceMatch = match;
+      break;
+    }
+  }
+
+  // 2. Fallback: Look for XX.99 or XX.00 pattern if no $ found
+  if (!priceMatch) {
+    for (const line of reverseLines) {
+      const match = line.match(/(\d{1,4}\.(?:99|00|95|50))/);
+      if (match) {
+        priceMatch = match;
+        break;
+      }
+    }
+  }
+
   const price = priceMatch ? priceMatch[1] : "";
 
   // SKU: line of all caps letters/digits, ~6+ chars, not a URL
