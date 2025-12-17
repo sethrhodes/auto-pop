@@ -147,6 +147,24 @@ app.post("/api/generate-images", async (req, res) => {
   }
 });
 
+app.post("/api/regenerate-image", async (req, res) => {
+  try {
+    const { frontFilename, backFilename, gender, shotIndex } = req.body;
+    if (shotIndex === undefined) return res.status(400).json({ error: "shotIndex required" });
+
+    const result = await require("./imageGenClient").generateSingleShot({
+      frontFilename,
+      backFilename,
+      gender,
+      shotIndex
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("Error in /api/regenerate-image:", err.message);
+    res.status(500).json({ error: "Regeneration failed", details: err.message });
+  }
+});
+
 /**
  * 3. PUBLISH ENDPOINT
  * Takes final data and creates WooCommerce product.
@@ -154,7 +172,7 @@ app.post("/api/generate-images", async (req, res) => {
 app.post("/api/publish", async (req, res) => {
   try {
     const { product } = req.body;
-    // Expecting product to have: { name, price, description, short_description, quantity, ... }
+    // Expecting product to have: { name, price, description, short_description, quantity, gallery: [{url, ...}] }
 
     if (!product || !product.name || !product.price) {
       return res.status(400).json({ error: "Product name and price are required" });
@@ -162,11 +180,19 @@ app.post("/api/publish", async (req, res) => {
 
     console.log("Publishing product:", product.name);
 
+    // Format images for WooCommerce: [{ src: 'url' }, ...]
+    const wooImages = (product.gallery || []).map(img => ({
+      src: img.url
+    }));
+
     const wooProduct = await createProduct({
       name: product.name,
       price: product.price,
+      sku: product.sku,
       quantity: product.quantity || 1,
-      // Pass other fields if createProduct supports them (we might need to update wooClient too)
+      description: product.description,
+      short_description: product.short_description,
+      images: wooImages
     });
 
     // TODO: Update wooClient to accept description if needed, 

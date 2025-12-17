@@ -69,7 +69,7 @@ async function uploadToClaid(filePath) {
 /**
  * Helper to start a Claid generation task with retries for 429
  */
-async function triggerClaidGeneration(taskId, imageUrl, pose) {
+async function triggerClaidGeneration(taskId, imageUrl, pose, aspectRatio = "3:4") {
   const payload = {
     input: {
       clothing: [imageUrl] // Send only the specific side
@@ -77,6 +77,7 @@ async function triggerClaidGeneration(taskId, imageUrl, pose) {
     options: {
       pose: pose,
       background: "minimalistic studio background, ecommerce product photography, soft even lighting",
+      aspect_ratio: aspectRatio
     },
   };
 
@@ -169,50 +170,106 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
   // Determine model terms based on gender "Men" -> "male model", "Women" -> "female model"
   const modelTerm = gender && gender.toLowerCase().includes("men") ? "male model" : "female model";
 
-  // 2. Trigger Sequential Model Generations (4 Shots)
-  // Shot 1: Front Close Up (Waist to Neck/Chin - Detail Focus)
+  // 2. Trigger Sequential Model Generations (3 Shots)
+  // Shot 1: Front Close Up (Waist Up - Hood Down)
   const task1 = await triggerClaidGeneration(
     "SHOT_1",
     frontUrl,
-    `detail fashion shot of ${modelTerm}, cropped from waist to chin, headless or cropped at neck, front view, focus on clothing fabric and design, neutral background, studio lighting`
+    `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, white background, studio lighting`,
+    "3:4"
   );
   const url1 = await pollClaidTask("SHOT_1", task1.result_url);
 
-  // Shot 2: Back Close Up (Waist to Head) - Matches Shot 1 style
+  // Shot 2: Back Close Up (Waist Up - Hood Up)
   const task2 = await triggerClaidGeneration(
     "SHOT_2",
     backUrl,
-    `medium close up portrait of ${modelTerm}, cropped from waist to top of head, back view, neutral background, studio lighting`
+    `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, white background, studio lighting`,
+    "3:4"
   );
   const url2 = await pollClaidTask("SHOT_2", task2.result_url);
 
-  // Shot 3: Lifestyle 1 (Beach Sitting)
+  // Shot 3: Lifestyle 1 (Beach Walking)
   const task3 = await triggerClaidGeneration(
     "SHOT_3",
     frontUrl,
-    `lifestyle photography of single ${modelTerm} sitting on sand on a calm beach, one person only, no collage, no split screen, centered subject, sunny day, ocean in background, wearing the clothing, natural lighting`
+    `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`,
+    "3:4"
   );
   const url3 = await pollClaidTask("SHOT_3", task3.result_url);
 
-  // Shot 4: Lifestyle 2 (Urban Strut/Walking)
-  const task4 = await triggerClaidGeneration(
-    "SHOT_4",
-    frontUrl,
-    `lifestyle photography of single ${modelTerm} walking on a city street, urban setting, soft blurred background, one person only, no collage, full body shot, wearing the clothing, natural daylight`
-  );
-  const url4 = await pollClaidTask("SHOT_4", task4.result_url);
+  // Shot 4: Lifestyle 2 (Urban Strut/Walking) - REMOVED
+  // const task4 = await triggerClaidGeneration(...)
 
   // 4. Return formatted results as a "Gallery"
   return {
     gallery: [
       { label: "Front Detail", url: url1 }, // url1 is Front Close Up
       { label: "Back Detail", url: url2 },
-      { label: "Beach Lifestyle", url: url3 },
-      { label: "Urban Lifestyle", url: url4 }
+      { label: "Beach Lifestyle", url: url3 }
     ]
   };
 }
 
+const SHOT_ASPECT_RATIO = "3:4";
+
+async function generateSingleShot({ frontFilename, backFilename, gender = "female", shotIndex }) {
+  if (!IMAGE_API_KEY) throw new Error("IMAGE_API_KEY must be set in backend/.env");
+
+  const frontPath = path.join(__dirname, "uploads", frontFilename);
+  const backPath = path.join(__dirname, "uploads", backFilename);
+
+  if (!fs.existsSync(frontPath)) throw new Error(`Front not found: ${frontPath}`);
+  if (!fs.existsSync(backPath)) throw new Error(`Back not found: ${backPath}`);
+
+  // Upload or reuse? For simplicity, re-upload (Claid expiration etc).
+  // Optimization: Could store temp URLs in frontend/backend state, but re-upload is safer.
+  const [frontUrl, backUrl] = await Promise.all([
+    uploadToClaid(frontPath),
+    uploadToClaid(backPath),
+  ]);
+
+  const modelTerm = gender && gender.toLowerCase().includes("men") ? "male model" : "female model";
+  let task, taskId;
+
+  // Define logic for each shot (matches generateOnModelAndGhost)
+  if (shotIndex === 0) {
+    // Shot 1: Front Close Up
+    taskId = "REGEN_SHOT_1";
+    task = await triggerClaidGeneration(
+      taskId,
+      frontUrl,
+      `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, neutral background, studio lighting`,
+      SHOT_ASPECT_RATIO
+    );
+  } else if (shotIndex === 1) {
+    // Shot 2: Back Close Up
+    taskId = "REGEN_SHOT_2";
+    task = await triggerClaidGeneration(
+      taskId,
+      backUrl,
+      `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, neutral background, studio lighting`,
+      SHOT_ASPECT_RATIO
+    );
+  } else if (shotIndex === 2) {
+    // Shot 3: Lifestyle 1
+    taskId = "REGEN_SHOT_3";
+    task = await triggerClaidGeneration(
+      taskId,
+      frontUrl,
+      `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`,
+      SHOT_ASPECT_RATIO
+    );
+
+  } else {
+    throw new Error("Invalid shotIndex (0-2)");
+  }
+
+  const url = await pollClaidTask(taskId, task.result_url);
+  return { url, shotIndex };
+}
+
 module.exports = {
   generateOnModelAndGhost,
+  generateSingleShot
 };

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import UploadStep from './components/UploadStep';
-import ProductPageMockup from './components/ProductPageMockup';
+import ProductEditor from './components/ProductEditor';
 
 const BACKEND_URL = 'http://localhost:3000';
 
@@ -154,7 +154,7 @@ function App() {
           )}
 
           {step === 2 && (
-            <ProductPageMockup
+            <ProductEditor
               draftData={draftData}
               onPublish={handlePublish}
               onBack={() => setStep(1)}

@@ -38,14 +38,45 @@ function parseTagMetadata(rawText = "") {
 
   const price = priceMatch ? priceMatch[1] : "";
 
-  // SKU: line of all caps letters/digits, ~6+ chars, not a URL
-  const skuLine =
-    lines.find(
-      (l) =>
-        /^[A-Z0-9]+$/.test(l.replace(/\s+/g, "")) &&
-        l.length >= 6 &&
-        !l.toLowerCase().includes(".com")
-    ) || "";
+  // SKU: Look for valid tokens (A-Z0-9, 6+ chars) that are NOT blocked words
+  const SKIP_WORDS = new Set([
+    "NORCAL", "NOR-CAL", "ORIGINAL", "HOODY", "HOODIE", "CALIFORNIA", "SURFSHOP",
+    "COTTON", "POLYESTER", "MEDIUM", "LARGE", "SMALL", "XSMALL", "XXLARGE",
+    "CHINA", "WASH", "MACHINE", "TUMBLE", "BLEACH", "REMOVE", "DECORATION"
+  ]);
+
+  let foundSku = "";
+  // Scan all lines/tokens
+  for (const line of lines) {
+    const tokens = line.split(/\s+/);
+    for (const token of tokens) {
+      // clean potential trailing punctuation. Uppercase first to avoid stripping lowercase valid chars if any,
+      // and to ensure garbage strings are fully expanded to their real length.
+      const cleanToken = token.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+
+      // Validation:
+      // 1. Length >= 6
+      // 2. Not a URL (handled by regex mostly, but check .com)
+      // 3. Not in skip list
+      // 4. Matches strictly caps/nums (allowing hyphen?)
+      if (
+        cleanToken.length >= 6 &&
+        cleanToken.length <= 16 &&
+        /^[A-Z0-9-]+$/.test(cleanToken) &&
+        !SKIP_WORDS.has(cleanToken) &&
+        !cleanToken.includes(".COM") &&
+        !cleanToken.match(/^\d+\.\d{2}$/) // not a price like 54.95
+      ) {
+        // Prefer alphanumeric mixed, but plain text is okay if not skipped.
+        // Current case: NCHOGBLKM is 9 chars.
+        foundSku = cleanToken;
+        break;
+      }
+    }
+    if (foundSku) break;
+  }
+
+  const skuLine = foundSku; // Mapping to old variable name (it's just the SKU now, not whole line)
 
   // Product line: line with HOODY/HOODIE/TEE/etc.
   const productLine =

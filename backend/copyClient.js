@@ -89,9 +89,12 @@ If info is missing, stay generic rather than guessing.
     throw new Error("No content returned from OpenAI");
   }
 
+  // Sanitize Markdown JSON code blocks
+  const cleanMessage = message.replace(/^```json/, "").replace(/^```/, "").replace(/```$/, "").trim();
+
   // Try to parse JSON; if it fails, wrap as fallback
   try {
-    const parsed = JSON.parse(message);
+    const parsed = JSON.parse(cleanMessage);
     return parsed;
   } catch (err) {
     // Fallback: return plain text wrapped in a simple structure
