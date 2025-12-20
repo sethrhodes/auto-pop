@@ -67,7 +67,7 @@ async function uploadToClaid(filePath, apiKey) {
 /**
  * Helper to start a Claid generation task with retries for 429
  */
-async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio = "3:4", apiKey) {
+async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio = "3:4", apiKey, customBgUrl = null) {
   const payload = {
     input: {
       clothing: [imageUrl] // Send only the specific side
@@ -78,6 +78,16 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, 
       aspect_ratio: aspectRatio
     },
   };
+
+  if (customBgUrl) {
+    // If a custom background image is provided, pass it.
+    // Note: API field might be 'background_image' or 'background_image_url'.
+    // We'll try 'background_image_url' and also 'background_image' to be safe or just one common one.
+    // Standard Claid/similar convention often prefers 'background_image'.
+    payload.options.background_image_url = customBgUrl;
+    // We keep 'background' (prompt) as fallback or hint, or remove it?
+    // Usually explicit image overrides prompt.
+  }
 
   const maxRetries = 3;
   let attempt = 0;
@@ -210,6 +220,18 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
   const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
+  // Check for Custom Background File
+  let customBgUrl = null;
+  const customBgPath = path.join(__dirname, "uploads", "custom_beach_bg.jpg");
+  if (fs.existsSync(customBgPath)) {
+    console.log("Found custom background image, uploading...");
+    try {
+      customBgUrl = await uploadToClaid(customBgPath, apiKey);
+    } catch (e) {
+      console.error("Failed to upload custom BG:", e.message);
+    }
+  }
+
   // 2. Trigger Sequential Model Generations (3 Shots)
 
   // Shot 1: Front
@@ -221,7 +243,8 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
   const url2 = await pollClaidTask("SHOT_2", task2.result_url, apiKey);
 
   // Shot 3: Lifestyle
-  const task3 = await triggerClaidGeneration("SHOT_3", frontUrl, shot3Prompt, BEACH_BG, "3:4", apiKey);
+  // Use customBgUrl if available
+  const task3 = await triggerClaidGeneration("SHOT_3", frontUrl, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl);
   const url3 = await pollClaidTask("SHOT_3", task3.result_url, apiKey);
 
   return {
@@ -281,6 +304,18 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
+  // Check for Custom Background File
+  let customBgUrl = null;
+  const customBgPath = path.join(__dirname, "uploads", "custom_beach_bg.jpg");
+  if (shotIndex === 2 && fs.existsSync(customBgPath)) {
+    console.log("Found custom background image for regen, uploading...");
+    try {
+      customBgUrl = await uploadToClaid(customBgPath, apiKey);
+    } catch (e) {
+      console.error("Failed to upload custom BG:", e.message);
+    }
+  }
+
   if (shotIndex === 0) {
     // Shot 1: Front
     taskId = "REGEN_SHOT_1";
@@ -306,7 +341,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
       ? `lifestyle photography of single ${modelTerm} walking away, focus on pants/shorts, wearing the clothing`
       : getTopPrompts('lifestyle');
 
-    task = await triggerClaidGeneration(taskId, frontUrl, prompt, BEACH_BG, SHOT_ASPECT_RATIO, apiKey);
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, BEACH_BG, SHOT_ASPECT_RATIO, apiKey, customBgUrl);
   } else {
     throw new Error("Invalid shotIndex (0-2)");
   }
