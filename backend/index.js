@@ -25,6 +25,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
+// SERVE FRONTEND (Production)
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
 // Ensure uploads dir exists
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -391,6 +394,11 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
     console.error("Error in /api/publish:", err.message);
     res.status(500).json({ error: "Publish failed", details: err.message });
   }
+});
+
+// SPA Catch-all (for React Router)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
 });
 
 // START SERVER
