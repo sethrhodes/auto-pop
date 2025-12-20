@@ -74,23 +74,51 @@ async function getPool() {
 }
 
 /**
- * Get ALL variants for a given Style ID
+ * Parse Parent Style from SKU by removing size suffix
+ * Suffixes: S, M, L, XL, 2XL (and maybe XS, 3XL?)
+ * User specified: S, M, L, XL, 2XL
+ */
+function extractStyleFromSku(sku) {
+    if (!sku) return null;
+    // Regex to match ending sizes. Order matters (longer first to avoid partial match)
+    // 2XL must come before L, XL before L.
+    const suffixRegex = /(.*)(2XL|XL|L|M|S)$/;
+    const match = sku.match(suffixRegex);
+    if (match) {
+        return match[1]; // The part before the suffix
+    }
+    return sku; // Return original if no suffix found (assumed parent or non-sized)
+}
+
+/**
+ * Get ALL variants for a given Style ID (or SKU Prefix)
  */
 async function getVariantsByStyle(styleId) {
     const config = await getConfig();
     if (config.server === 'simulation') {
-        return mockInventory.filter(i => i.StyleID === styleId);
+        // Mock: Find items that start with styleId
+        return mockInventory.filter(i =>
+            i.StyleID === styleId || i.ItemLookupCode.startsWith(styleId)
+        );
     }
 
     try {
         const pool = await getPool();
         if (!pool) return [];
-        // Real RMS Query (Hypothetical schema: Item.StyleID or similar grouping)
-        // Adjust query to fit actual schema if known. Assuming 'StyleID' field or similar.
+
+        // Query both StyleID column AND ItemLookupCode prefix
+        // This covers both explicit grouping and implicit naming convention
         const result = await pool.request()
             .input('style', sql.NVarChar, styleId)
-            .query('SELECT ItemLookupCode, Quantity, Description, Price, LastUpdated, StyleID FROM Item WHERE StyleID = @style');
+            .query(`
+                SELECT ItemLookupCode, Quantity, Description, Price, LastUpdated, StyleID 
+                FROM Item 
+                WHERE StyleID = @style 
+                   OR ItemLookupCode LIKE @style + '%'
+            `);
 
+        // Filter out things that might match prefix but aren't related? 
+        // For now, trust the prefix.
         return result.recordset;
     } catch (e) {
         console.error("RMS getVariantsByStyle error:", e.message);
@@ -224,5 +252,6 @@ module.exports = {
     updateItemStock,
     decrementItemStock,
     getItemsUpdatedSince,
-    getVariantsByStyle
+    getVariantsByStyle,
+    extractStyleFromSku
 };

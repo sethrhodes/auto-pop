@@ -31,11 +31,15 @@ async function syncRmsToWeb() {
             // In real world, we might get an Item that has a StyleID column.
             const styleIdsToSync = new Set();
             for (const item of changes) {
-                if (item.StyleID) {
+                // 1. Try to deduce Style ID from convention (Suffix stripping)
+                // This takes priority as per user request
+                let deducedStyle = rms.extractStyleFromSku(item.ItemLookupCode);
+
+                if (deducedStyle) {
+                    styleIdsToSync.add(deducedStyle);
+                } else if (item.StyleID) {
                     styleIdsToSync.add(item.StyleID);
                 } else if (item.ItemLookupCode) {
-                    // Fallback: If no StyleID, treat SKU as solitary style (old behavior or unstyled item)
-                    // limit: we might interpret this as StyleID = SKU
                     styleIdsToSync.add(item.ItemLookupCode);
                 }
 
