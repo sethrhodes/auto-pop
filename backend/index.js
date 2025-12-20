@@ -397,7 +397,8 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
 });
 
 // SPA Catch-all (for React Router)
-app.get("*", (req, res) => {
+// Note: using regex due to Express 5 syntax change regarding '*'
+app.get(/(.*)/, (req, res) => {
   const indexPath = path.join(__dirname, "../frontend/dist", "index.html");
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
