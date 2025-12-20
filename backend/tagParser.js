@@ -109,12 +109,22 @@ function parseTagMetadata(rawText = "") {
     .replace(/\s+/g, " ")
     .trim();
 
+  // Strip size suffix from SKU (e.g. NCHOGBLKM -> NCHOGBLK)
+  let cleanSku = skuLine;
+  if (cleanSku) {
+    const suffixRegex = /(.*)(2XL|XL|L|M|S)$/;
+    const match = cleanSku.match(suffixRegex);
+    if (match) {
+      cleanSku = match[1];
+    }
+  }
+
   return {
     brand: brandLine,
     productType: cleanProductType || productLine,
     color,
     size,
-    sku: skuLine,
+    sku: cleanSku,
     price,
     rawLines: lines,
   };
