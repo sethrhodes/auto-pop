@@ -70,7 +70,9 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
                     frontFilename: draftData.images.front,
                     backFilename: draftData.images.back,
                     gender: gender || draftData.analysis?.detected?.department || "women", // Use passed gender
-                    shotIndex: idx
+                    shotIndex: idx,
+                    isHooded: draftData.isHooded,
+                    category: draftData.analysis?.detected?.category || "top" // Pass category too just in case
                 })
             });
 

@@ -142,7 +142,7 @@ function Wizard() {
   };
 
   // STEP 1: Handle Upload -> Draft Creation AND Auto-Generate Images
-  const handleUploadNext = async ({ images, gender, category }) => {
+  const handleUploadNext = async ({ images, gender, category, isHooded }) => {
     setLoading(true); // Show spinner on Upload button momentarily
     setSelectedGender(gender);
     // setQuantity(quantity); // Removed: Quantity will be handled later via DB/Inventory
@@ -192,7 +192,8 @@ function Wizard() {
           frontFilename: draftData.images.front,
           backFilename: draftData.images.back,
           gender: gender, // Use user selected gender
-          category: category || 'top'
+          category: category || 'top',
+          isHooded: isHooded
         })
       });
       const genData = await genRes.json();
@@ -205,6 +206,7 @@ function Wizard() {
       // 4. Merge Data and Move to Mockup
       setDraftData(prev => ({
         ...prev,
+        isHooded: isHooded, // Store for regeneration
         gallery: genData.gallery // Attach generated gallery to draft data
       }));
 

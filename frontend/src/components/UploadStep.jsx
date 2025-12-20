@@ -4,6 +4,7 @@ export default function UploadStep({ onNext, isLoading }) {
     const [images, setImages] = useState({ front: null, back: null, tag: null });
     const [gender, setGender] = useState('men');
     const [category, setCategory] = useState('top');
+    const [isHooded, setIsHooded] = useState(true);
 
     const handleFileChange = (e, type) => {
         if (e.target.files && e.target.files[0]) {
@@ -14,7 +15,7 @@ export default function UploadStep({ onNext, isLoading }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (images.front && images.back && images.tag) {
-            onNext({ images, gender, category });
+            onNext({ images, gender, category, isHooded });
         } else {
             alert("Please upload all 3 images (front, back, tag).");
         }
@@ -74,6 +75,36 @@ export default function UploadStep({ onNext, isLoading }) {
                             </label>
                         ))}
                     </div>
+
+                    {category === 'top' && (
+                        <div className="mb-6 animate-fadeIn">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Style Type
+                            </label>
+                            <div className="flex gap-4">
+                                <label className={`flex-1 border rounded-md p-3 flex items-center justify-center cursor-pointer transition-colors ${isHooded ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' : 'border-gray-300 hover:bg-gray-50'}`}>
+                                    <input
+                                        type="radio"
+                                        name="isHooded"
+                                        checked={isHooded}
+                                        onChange={() => setIsHooded(true)}
+                                        className="sr-only"
+                                    />
+                                    <span>Hooded</span>
+                                </label>
+                                <label className={`flex-1 border rounded-md p-3 flex items-center justify-center cursor-pointer transition-colors ${!isHooded ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' : 'border-gray-300 hover:bg-gray-50'}`}>
+                                    <input
+                                        type="radio"
+                                        name="isHooded"
+                                        checked={!isHooded}
+                                        onChange={() => setIsHooded(false)}
+                                        className="sr-only"
+                                    />
+                                    <span>Non-Hooded</span>
+                                </label>
+                            </div>
+                        </div>
+                    )}
 
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         Model Gender

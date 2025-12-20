@@ -148,7 +148,7 @@ app.post(
  */
 app.post("/api/generate-images", authenticateToken, loadUserKeys, async (req, res) => {
   try {
-    const { frontFilename, backFilename, gender, category } = req.body;
+    const { frontFilename, backFilename, gender, category, isHooded } = req.body;
 
     if (!frontFilename || !backFilename) {
       return res.status(400).json({ error: "frontFilename and backFilename required" });
@@ -160,6 +160,7 @@ app.post("/api/generate-images", authenticateToken, loadUserKeys, async (req, re
       backFilename,
       gender,
       category,
+      isHooded,
       apiKeys: req.userKeys // PASS DYNAMIC KEYS
     });
 
@@ -173,7 +174,7 @@ app.post("/api/generate-images", authenticateToken, loadUserKeys, async (req, re
 
 app.post("/api/regenerate-image", authenticateToken, loadUserKeys, async (req, res) => {
   try {
-    const { frontFilename, backFilename, gender, category, shotIndex } = req.body;
+    const { frontFilename, backFilename, gender, category, shotIndex, isHooded } = req.body;
     console.log(`[REGEN] Request: front=${frontFilename}, back=${backFilename}, index=${shotIndex}`); // DEBUG
 
     if (shotIndex === undefined) return res.status(400).json({ error: "shotIndex required" });
@@ -184,6 +185,8 @@ app.post("/api/regenerate-image", authenticateToken, loadUserKeys, async (req, r
       gender,
       shotIndex,
       category,
+      isHooded,
+      apiKeys: req.userKeys
       apiKeys: req.userKeys
     });
     res.json(result);
