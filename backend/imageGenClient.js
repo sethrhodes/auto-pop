@@ -191,7 +191,8 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
     : `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing`;
 
   // Backgrounds
-  const WHITE_BG = "solid plain white background, high key studio lighting";
+  // "High key" sometimes adds grey gradients. Switching to "flat white" instructions.
+  const WHITE_BG = "pure flat white background, hex color #FFFFFF, no shadows, commercial isolation";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   // 2. Trigger Sequential Model Generations (3 Shots)
@@ -249,7 +250,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   const isBottom = category === "bottom";
 
   let task, taskId;
-  const WHITE_BG = "solid plain white background, high key studio lighting";
+  const WHITE_BG = "pure flat white background, hex color #FFFFFF, no shadows, commercial isolation";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   if (shotIndex === 0) {
