@@ -191,18 +191,18 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
     : `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing`;
 
   // Backgrounds
-  // "High key" sometimes adds grey gradients. Switching to "flat white" instructions.
-  const WHITE_BG = "pure flat white background, hex color #FFFFFF, no shadows, commercial isolation";
+  // User requested "light grey" specifically.
+  const STANDARD_BG = "light grey professional studio background, hex color #E5E5E5, soft shadows";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   // 2. Trigger Sequential Model Generations (3 Shots)
 
   // Shot 1: Front
-  const task1 = await triggerClaidGeneration("SHOT_1", frontUrl, shot1Prompt, WHITE_BG, "3:4", apiKey);
+  const task1 = await triggerClaidGeneration("SHOT_1", frontUrl, shot1Prompt, STANDARD_BG, "3:4", apiKey);
   const url1 = await pollClaidTask("SHOT_1", task1.result_url, apiKey);
 
   // Shot 2: Back
-  const task2 = await triggerClaidGeneration("SHOT_2", backUrl, shot2Prompt, WHITE_BG, "3:4", apiKey);
+  const task2 = await triggerClaidGeneration("SHOT_2", backUrl, shot2Prompt, STANDARD_BG, "3:4", apiKey);
   const url2 = await pollClaidTask("SHOT_2", task2.result_url, apiKey);
 
   // Shot 3: Lifestyle
@@ -250,7 +250,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   const isBottom = category === "bottom";
 
   let task, taskId;
-  const WHITE_BG = "pure flat white background, hex color #FFFFFF, no shadows, commercial isolation";
+  const STANDARD_BG = "light grey professional studio background, hex color #E5E5E5, soft shadows";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   if (shotIndex === 0) {
@@ -260,7 +260,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
       ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus`
       : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view`;
 
-    task = await triggerClaidGeneration(taskId, frontUrl, prompt, WHITE_BG, SHOT_ASPECT_RATIO, apiKey);
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey);
 
   } else if (shotIndex === 1) {
     // Shot 2: Back
@@ -269,7 +269,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
       ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus`
       : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view`;
 
-    task = await triggerClaidGeneration(taskId, backUrl, prompt, WHITE_BG, SHOT_ASPECT_RATIO, apiKey);
+    task = await triggerClaidGeneration(taskId, backUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey);
 
   } else if (shotIndex === 2) {
     // Shot 3: Lifestyle
