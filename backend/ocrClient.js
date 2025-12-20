@@ -1,103 +1,62 @@
 // backend/ocrClient.js
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios");
 const FormData = require("form-data");
 const sharp = require("sharp");
 require("dotenv").config();
 
-const OCR_API_URL =
-  process.env.OCR_API_URL || "https://api.ocr.space/parse/image";
-const OCR_API_KEY = process.env.OCR_API_KEY;
+async function extractTagText({ tagFilename, apiKeys = {} }) {
+  const apiKey = apiKeys.OCR_API_KEY || process.env.OCR_API_KEY;
+  const apiUrl = process.env.OCR_API_URL || "https://api.ocr.space/parse/image";
 
-const MAX_OCR_SIZE_BYTES = 1024 * 1024; // 1 MB
+  // Fallback if no key provided
+  const resolvedKey = apiKey || 'helloworld';
 
-/**
- * Use OCR.Space to extract text from a saved tag image.
- *
- * Returns:
- * {
- *   rawText: "full text from tag",
- *   lines: ["line 1", "line 2", ...],
- *   ocr: { ...full OCR response... }
- * }
- */
-async function extractTagText({ tagFilename }) {
-  if (!OCR_API_KEY) {
-    throw new Error("OCR_API_KEY must be set in backend/.env");
+  const filePath = path.join(__dirname, "uploads", tagFilename);
+  if (!fs.existsSync(filePath)) {
+    throw new Error("Tag image not found");
   }
 
-  if (!tagFilename) {
-    throw new Error("tagFilename is required");
+  try {
+    // Resize image to ensure it's under 1MB limit for free OCR API
+    const resizedBuffer = await sharp(filePath)
+      .resize({ width: 1000, height: 1000, fit: 'inside' })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    const form = new FormData();
+    // Pass buffer with filename and contentType options
+    form.append("file", resizedBuffer, { filename: "tag.jpg", contentType: "image/jpeg" });
+    form.append("language", "eng");
+    form.append("isOverlayRequired", "false");
+    form.append("apikey", resolvedKey);
+    form.append("OCREngine", "2"); // Better for special fonts
+
+    const response = await axios.post(apiUrl, form, {
+      headers: {
+        ...form.getHeaders()
+      }
+    });
+
+    if (response.data.IsErroredOnProcessing) {
+      throw new Error(response.data.ErrorMessage);
+    }
+
+    const parsedResults = response.data.ParsedResults;
+    if (!parsedResults || parsedResults.length === 0) {
+      return { rawText: "" };
+    }
+
+    const rawText = parsedResults[0].ParsedText;
+    // console.log("OCR Raw:", rawText);
+
+    return { rawText };
+
+  } catch (error) {
+    console.error("OCR API Error:", error.message);
+    return { rawText: "" };
   }
-
-  const tagPath = path.join(__dirname, "uploads", tagFilename);
-  if (!fs.existsSync(tagPath)) {
-    throw new Error(`Tag image not found at: ${tagPath}`);
-  }
-
-  // Decide which file to send (original or compressed)
-  let fileToSendPath = tagPath;
-  const { size } = fs.statSync(tagPath);
-
-  if (size > MAX_OCR_SIZE_BYTES) {
-    console.log(
-      `Tag image is ${size} bytes (>1MB). Compressing before OCR...`
-    );
-
-    const compressedName = `ocr-${Date.now()}-${tagFilename}.jpg`;
-    const compressedPath = path.join(__dirname, "uploads", compressedName);
-
-    // Simple strategy: resize to max width ~1200px, JPEG quality 70
-    await sharp(tagPath)
-      .resize({ width: 1200, withoutEnlargement: true })
-      .jpeg({ quality: 70 })
-      .toFile(compressedPath);
-
-    const { size: newSize } = fs.statSync(compressedPath);
-    console.log(`Compressed tag image to ${newSize} bytes: ${compressedPath}`);
-
-    fileToSendPath = compressedPath;
-  }
-
-  const form = new FormData();
-  form.append("file", fs.createReadStream(fileToSendPath));
-  form.append("apikey", OCR_API_KEY);
-  form.append("language", "eng");
-  form.append("isOverlayRequired", "false");
-
-  const res = await axios.post(OCR_API_URL, form, {
-    headers: form.getHeaders(),
-  });
-
-  const body = res.data;
-
-  if (body.IsErroredOnProcessing) {
-    const msg =
-      (Array.isArray(body.ErrorMessage)
-        ? body.ErrorMessage.join("; ")
-        : body.ErrorMessage) || "Unknown OCR error";
-    throw new Error(`OCR.Space error: ${msg}`);
-  }
-
-  const parsedResults = body.ParsedResults || [];
-  const text = parsedResults
-    .map((r) => r.ParsedText || "")
-    .join("\n\n")
-    .trim();
-
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  return {
-    rawText: text,
-    lines,
-    ocr: body,
-  };
 }
 
-module.exports = {
-  extractTagText,
-};
+module.exports = { extractTagText };

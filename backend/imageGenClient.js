@@ -7,8 +7,6 @@ require("dotenv").config();
 
 const IMAGE_API_URL =
   process.env.IMAGE_API_URL || "https://api.claid.ai/v1/image/ai-fashion-models";
-const IMAGE_API_KEY = process.env.IMAGE_API_KEY;
-
 
 // Helper to sleep
 function sleep(ms) {
@@ -19,7 +17,7 @@ function sleep(ms) {
  * Upload a local file to Claid to get a temporary public URL.
  * We use a minimal "resize" op or similar to trigger the upload flow.
  */
-async function uploadToClaid(filePath) {
+async function uploadToClaid(filePath, apiKey) {
   const form = new FormData();
   form.append("file", fs.createReadStream(filePath));
   // Minimal config to just get the file uploaded and returned
@@ -47,7 +45,7 @@ async function uploadToClaid(filePath) {
   const res = await axios.post(uploadUrl, form, {
     headers: {
       ...form.getHeaders(),
-      Authorization: `Bearer ${IMAGE_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     validateStatus: () => true, // Don't throw on error status
   });
@@ -69,7 +67,7 @@ async function uploadToClaid(filePath) {
 /**
  * Helper to start a Claid generation task with retries for 429
  */
-async function triggerClaidGeneration(taskId, imageUrl, pose, aspectRatio = "3:4") {
+async function triggerClaidGeneration(taskId, imageUrl, pose, aspectRatio = "3:4", apiKey) {
   const payload = {
     input: {
       clothing: [imageUrl] // Send only the specific side
@@ -89,7 +87,7 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, aspectRatio = "3:4
       console.log(`[${taskId}] Triggering Claid generation (attempt ${attempt + 1})...`);
       const res = await axios.post(IMAGE_API_URL, payload, {
         headers: {
-          Authorization: `Bearer ${IMAGE_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
       });
@@ -116,7 +114,7 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, aspectRatio = "3:4
 /**
  * Poll a single Claid task until completion
  */
-async function pollClaidTask(taskId, resultUrl) {
+async function pollClaidTask(taskId, resultUrl, apiKey) {
   const maxAttempts = 20;
   const delayMs = 3000;
 
@@ -124,7 +122,7 @@ async function pollClaidTask(taskId, resultUrl) {
     await sleep(delayMs);
 
     const res = await axios.get(resultUrl, {
-      headers: { Authorization: `Bearer ${IMAGE_API_KEY}` },
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
 
     const status = res.data?.data?.status;
@@ -145,9 +143,10 @@ async function pollClaidTask(taskId, resultUrl) {
   throw new Error(`[${taskId}] Timed out`);
 }
 
-async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "female" }) {
-  if (!IMAGE_API_KEY) {
-    throw new Error("IMAGE_API_KEY must be set in backend/.env");
+async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "female", category = "top", apiKeys = {} }) {
+  const apiKey = apiKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY;
+  if (!apiKey) {
+    throw new Error("IMAGE_API_KEY missing (Check Settings or .env)");
   }
 
   const frontPath = path.join(__dirname, "uploads", frontFilename);
@@ -156,55 +155,59 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
   if (!fs.existsSync(frontPath)) throw new Error(`Front not found: ${frontPath}`);
   if (!fs.existsSync(backPath)) throw new Error(`Back not found: ${backPath}`);
 
-  // 1. Upload both images (Ghost Images = These Uploads, roughly)
-  // Ideally, we would run a "Remove Background" op here for true ghost mannequin,
-  // but for now we return the uploaded "temporary" URLs which are accessible.
-  // Note: These Claid temp URLs expire in 24h, which is fine for this session.
   const [frontUrl, backUrl] = await Promise.all([
-    uploadToClaid(frontPath),
-    uploadToClaid(backPath),
+    uploadToClaid(frontPath, apiKey),
+    uploadToClaid(backPath, apiKey),
   ]);
 
-  console.log("Uploaded Ghost/Source URLs:", { frontUrl, backUrl });
+  // Determine model terms
+  let modelTerm = "female model";
+  if (gender === "men") {
+    modelTerm = "male model";
+  } else if (gender === "kids") {
+    modelTerm = "child model";
+  } else if (gender === "womens" || gender === "women") {
+    modelTerm = "female model";
+  } else if (gender === "unisex") {
+    modelTerm = "model"; // Neutral term
+  }
 
-  // Determine model terms based on gender "Men" -> "male model", "Women" -> "female model"
-  const modelTerm = gender && gender.toLowerCase().includes("men") ? "male model" : "female model";
+  // --- PROMPT LOGIC ---
+  const isBottom = category === "bottom";
+
+  // Shot 1 Prompts
+  const shot1Prompt = isBottom
+    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus, neutral background, studio lighting`
+    : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, white background, studio lighting`;
+
+  // Shot 2 Prompts
+  const shot2Prompt = isBottom
+    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus, neutral background, studio lighting`
+    : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, white background, studio lighting`;
+
+  // Shot 3 Prompts (Lifestyle)
+  const shot3Prompt = isBottom
+    ? `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, full body shot walking away, focus on pants/shorts, wearing the clothing, cinematic lighting`
+    : `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`;
+
 
   // 2. Trigger Sequential Model Generations (3 Shots)
-  // Shot 1: Front Close Up (Waist Up - Hood Down)
-  const task1 = await triggerClaidGeneration(
-    "SHOT_1",
-    frontUrl,
-    `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, white background, studio lighting`,
-    "3:4"
-  );
-  const url1 = await pollClaidTask("SHOT_1", task1.result_url);
 
-  // Shot 2: Back Close Up (Waist Up - Hood Up)
-  const task2 = await triggerClaidGeneration(
-    "SHOT_2",
-    backUrl,
-    `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, white background, studio lighting`,
-    "3:4"
-  );
-  const url2 = await pollClaidTask("SHOT_2", task2.result_url);
+  // Shot 1: Front
+  const task1 = await triggerClaidGeneration("SHOT_1", frontUrl, shot1Prompt, "3:4", apiKey);
+  const url1 = await pollClaidTask("SHOT_1", task1.result_url, apiKey);
 
-  // Shot 3: Lifestyle 1 (Beach Walking)
-  const task3 = await triggerClaidGeneration(
-    "SHOT_3",
-    frontUrl,
-    `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`,
-    "3:4"
-  );
-  const url3 = await pollClaidTask("SHOT_3", task3.result_url);
+  // Shot 2: Back
+  const task2 = await triggerClaidGeneration("SHOT_2", backUrl, shot2Prompt, "3:4", apiKey);
+  const url2 = await pollClaidTask("SHOT_2", task2.result_url, apiKey);
 
-  // Shot 4: Lifestyle 2 (Urban Strut/Walking) - REMOVED
-  // const task4 = await triggerClaidGeneration(...)
+  // Shot 3: Lifestyle
+  const task3 = await triggerClaidGeneration("SHOT_3", frontUrl, shot3Prompt, "3:4", apiKey);
+  const url3 = await pollClaidTask("SHOT_3", task3.result_url, apiKey);
 
-  // 4. Return formatted results as a "Gallery"
   return {
     gallery: [
-      { label: "Front Detail", url: url1 }, // url1 is Front Close Up
+      { label: "Front Detail", url: url1 },
       { label: "Back Detail", url: url2 },
       { label: "Beach Lifestyle", url: url3 }
     ]
@@ -213,8 +216,9 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
 
 const SHOT_ASPECT_RATIO = "3:4";
 
-async function generateSingleShot({ frontFilename, backFilename, gender = "female", shotIndex }) {
-  if (!IMAGE_API_KEY) throw new Error("IMAGE_API_KEY must be set in backend/.env");
+async function generateSingleShot({ frontFilename, backFilename, gender = "female", shotIndex, category = "top", apiKeys = {} }) {
+  const apiKey = apiKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY;
+  if (!apiKey) throw new Error("IMAGE_API_KEY missing");
 
   const frontPath = path.join(__dirname, "uploads", frontFilename);
   const backPath = path.join(__dirname, "uploads", backFilename);
@@ -222,50 +226,59 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   if (!fs.existsSync(frontPath)) throw new Error(`Front not found: ${frontPath}`);
   if (!fs.existsSync(backPath)) throw new Error(`Back not found: ${backPath}`);
 
-  // Upload or reuse? For simplicity, re-upload (Claid expiration etc).
-  // Optimization: Could store temp URLs in frontend/backend state, but re-upload is safer.
   const [frontUrl, backUrl] = await Promise.all([
-    uploadToClaid(frontPath),
-    uploadToClaid(backPath),
+    uploadToClaid(frontPath, apiKey),
+    uploadToClaid(backPath, apiKey),
   ]);
 
-  const modelTerm = gender && gender.toLowerCase().includes("men") ? "male model" : "female model";
+  let modelTerm = "female model";
+  if (gender === "men") {
+    modelTerm = "male model";
+  } else if (gender === "kids") {
+    modelTerm = "child model";
+  } else if (gender === "womens" || gender === "women") {
+    modelTerm = "female model";
+  } else if (gender === "unisex") {
+    modelTerm = "model";
+  }
+
+  // --- PROMPT LOGIC ---
+  const isBottom = category === "bottom";
+
   let task, taskId;
 
-  // Define logic for each shot (matches generateOnModelAndGhost)
   if (shotIndex === 0) {
-    // Shot 1: Front Close Up
+    // Shot 1: Front
     taskId = "REGEN_SHOT_1";
-    task = await triggerClaidGeneration(
-      taskId,
-      frontUrl,
-      `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, neutral background, studio lighting`,
-      SHOT_ASPECT_RATIO
-    );
+    const prompt = isBottom
+      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus, neutral background, studio lighting`
+      : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, neutral background, studio lighting`;
+
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, SHOT_ASPECT_RATIO, apiKey);
+
   } else if (shotIndex === 1) {
-    // Shot 2: Back Close Up
+    // Shot 2: Back
     taskId = "REGEN_SHOT_2";
-    task = await triggerClaidGeneration(
-      taskId,
-      backUrl,
-      `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, neutral background, studio lighting`,
-      SHOT_ASPECT_RATIO
-    );
+    const prompt = isBottom
+      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus, neutral background, studio lighting`
+      : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, neutral background, studio lighting`;
+
+    task = await triggerClaidGeneration(taskId, backUrl, prompt, SHOT_ASPECT_RATIO, apiKey);
+
   } else if (shotIndex === 2) {
-    // Shot 3: Lifestyle 1
+    // Shot 3: Lifestyle
     taskId = "REGEN_SHOT_3";
-    task = await triggerClaidGeneration(
-      taskId,
-      frontUrl,
-      `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`,
-      SHOT_ASPECT_RATIO
-    );
+    const prompt = isBottom
+      ? `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, full body shot walking away, focus on pants/shorts, wearing the clothing, cinematic lighting`
+      : `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`;
+
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, SHOT_ASPECT_RATIO, apiKey);
 
   } else {
     throw new Error("Invalid shotIndex (0-2)");
   }
 
-  const url = await pollClaidTask(taskId, task.result_url);
+  const url = await pollClaidTask(taskId, task.result_url, apiKey);
   return { url, shotIndex };
 }
 

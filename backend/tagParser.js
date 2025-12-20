@@ -69,8 +69,11 @@ function parseTagMetadata(rawText = "") {
       ) {
         // Prefer alphanumeric mixed, but plain text is okay if not skipped.
         // Current case: NCHOGBLKM is 9 chars.
+        console.log("Found Potential SKU:", cleanToken); // Log found token
         foundSku = cleanToken;
         break;
+      } else if (cleanToken.length >= 6) {
+        // console.log("Skipped Token:", cleanToken); // Debug skipped
       }
     }
     if (foundSku) break;

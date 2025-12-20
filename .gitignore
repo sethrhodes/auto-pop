@@ -1,18 +1,10 @@
-# Node dependencies
-node_modules/
-npm-debug.log
-yarn-error.log
-
-# Env files / secrets
+node_modules
 .env
-backend/.env
-frontend/.env
-
-# OS / editor cruft
 .DS_Store
-*.log
-
-# Build artifacts (if you add later)
-dist/
-build/
-backend/uploads/
+backend/database.sqlite
+backend/uploads/*
+!backend/uploads/.gitkeep
+frontend/dist
+frontend/build
+coverage
+.vscode

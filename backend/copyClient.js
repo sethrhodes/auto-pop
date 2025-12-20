@@ -2,113 +2,70 @@
 const axios = require("axios");
 require("dotenv").config();
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
-
-/**
- * Generate structured product copy from tag text + basic metadata.
- *
- * Returns:
- * {
- *   title: string,
- *   subtitle: string,
- *   description: string,
- *   bullets: string[],
- *   seo_keywords: string[]
- * }
- */
-async function generateProductCopy({
-  tagText,
-  brand,
-  productType,
-  styleNotes,
-}) {
-  if (!OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY must be set in backend/.env");
+async function generateProductCopy({ tagText, brand, productType, styleNotes, apiKeys = {} }) {
+  const apiKey = apiKeys.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY missing");
   }
 
   const systemPrompt = `
-You are an ecommerce copywriter for apparel brands.
-Given garment tag text and basic context, you create concise,
-conversion-focused product copy for an online store.
+You are an expert e-commerce copywriter for a high-end fashion boutique called 'Nor Cal Surf Shop'.
+Your style is:
+- Cool, relaxed, authentic surfer vibe.
+- Premium and detailed but not salesy.
+- Focus on material quality and fit.
+- Use words like 'stoked', 'premium', 'heavyweight', 'essential'.
+`;
 
-Output MUST be valid JSON ONLY, with this shape:
+  const userPrompt = `
+Generate product details based on this info:
+TAG TEXT (OCR): "${tagText}"
+DETECTED BRAND: "${brand}"
+TYPE: "${productType}"
+NOTES: "${styleNotes}"
 
+Output ONLY valid JSON:
 {
-  "title": "string - product name for PDP",
-  "subtitle": "string - short one-line value prop or style hook",
-  "description": "string - 2–4 sentences of detailed description",
-  "bullets": ["string", "..."],
-  "seo_keywords": ["string", "..."]
+  "title": "A catchy, SEO-friendly 3-5 word title (e.g. 'Stussy Heavyweight Pigment Dyed Hoodie')",
+  "price": "Estimated price (number only, e.g. 85.00) based on brand prestige. Stussy/Supreme = higher, Generic = lower.",
+  "subtitle": "2 sentence hook for the product card.",
+  "description": "Plain text only (no HTML). Concise, engaging product description. Maximum 3-4 sentences focusing on style and fit."
 }
+`;
 
-Keep tone clean and modern. Do not invent wild features.
-Infer size/material/care/fit only if clearly implied.
-If info is missing, stay generic rather than guessing.
-  `.trim();
-
-  const userPayload = {
-    tag_text: tagText || "",
-    brand: brand || "",
-    product_type: productType || "",
-    style_notes: styleNotes || "",
-  };
-
-  const messages = [
-    {
-      role: "system",
-      content: systemPrompt,
-    },
-    {
-      role: "user",
-      content:
-        "Here is the raw garment info as JSON:\n\n" +
-        JSON.stringify(userPayload, null, 2),
-    },
-  ];
-
-  const response = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: OPENAI_MODEL,
-      messages,
-      temperature: 0.7,
-      max_tokens: 400,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  const message = response.data.choices?.[0]?.message?.content?.trim();
-
-  if (!message) {
-    throw new Error("No content returned from OpenAI");
-  }
-
-  // Sanitize Markdown JSON code blocks
-  const cleanMessage = message.replace(/^```json/, "").replace(/^```/, "").replace(/```$/, "").trim();
-
-  // Try to parse JSON; if it fails, wrap as fallback
   try {
-    const parsed = JSON.parse(cleanMessage);
-    return parsed;
-  } catch (err) {
-    // Fallback: return plain text wrapped in a simple structure
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o", // or gpt-3.5-turbo
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const content = response.data.choices[0].message.content;
+    return JSON.parse(content);
+
+  } catch (error) {
+    console.error("OpenAI Copy Gen Error:", error.response ? error.response.data : error.message);
+    // Fallback
     return {
-      title: "",
-      subtitle: "",
-      description: message,
-      bullets: [],
-      seo_keywords: [],
-      _raw: message,
+      title: `${brand} ${productType} (Draft)`,
+      price: "0.00",
+      subtitle: "Cool item from Nor Cal Surf Shop.",
+      description: "Fresh inventory. Details coming soon."
     };
   }
 }
 
-module.exports = {
-  generateProductCopy,
-};
+module.exports = { generateProductCopy };

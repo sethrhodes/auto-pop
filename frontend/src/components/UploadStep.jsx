@@ -2,7 +2,8 @@ import { useState } from 'react';
 
 export default function UploadStep({ onNext, isLoading }) {
     const [images, setImages] = useState({ front: null, back: null, tag: null });
-    const [quantity, setQuantity] = useState(1);
+    const [gender, setGender] = useState('men');
+    const [category, setCategory] = useState('top');
 
     const handleFileChange = (e, type) => {
         if (e.target.files && e.target.files[0]) {
@@ -13,7 +14,7 @@ export default function UploadStep({ onNext, isLoading }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (images.front && images.back && images.tag) {
-            onNext({ images, quantity });
+            onNext({ images, gender, category });
         } else {
             alert("Please upload all 3 images (front, back, tag).");
         }
@@ -56,15 +57,42 @@ export default function UploadStep({ onNext, isLoading }) {
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Stock Quantity
+                        Product Category
                     </label>
-                    <input
-                        type="number"
-                        min="1"
-                        value={quantity}
-                        onChange={(e) => setQuantity(Number(e.target.value))}
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border"
-                    />
+                    <div className="flex gap-4 mb-6">
+                        {['top', 'bottom'].map((option) => (
+                            <label key={option} className={`flex-1 border rounded-md p-3 flex items-center justify-center cursor-pointer transition-colors ${category === option ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' : 'border-gray-300 hover:bg-gray-50'}`}>
+                                <input
+                                    type="radio"
+                                    name="category"
+                                    value={option}
+                                    checked={category === option}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    className="sr-only"
+                                />
+                                <span className="capitalize">{option}</span>
+                            </label>
+                        ))}
+                    </div>
+
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Model Gender
+                    </label>
+                    <div className="flex gap-4">
+                        {['men', 'womens', 'kids'].map((option) => (
+                            <label key={option} className={`flex-1 border rounded-md p-3 flex items-center justify-center cursor-pointer transition-colors ${gender === option ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' : 'border-gray-300 hover:bg-gray-50'}`}>
+                                <input
+                                    type="radio"
+                                    name="gender"
+                                    value={option}
+                                    checked={gender === option}
+                                    onChange={(e) => setGender(e.target.value)}
+                                    className="sr-only"
+                                />
+                                <span className="capitalize">{option}</span>
+                            </label>
+                        ))}
+                    </div>
                 </div>
 
                 <button
