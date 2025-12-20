@@ -192,7 +192,7 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
 
   // Backgrounds
   // User requested "light grey" specifically.
-  const STANDARD_BG = "light grey professional studio background, hex color #E5E5E5, soft shadows";
+  const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   // 2. Trigger Sequential Model Generations (3 Shots)
@@ -250,7 +250,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   const isBottom = category === "bottom";
 
   let task, taskId;
-  const STANDARD_BG = "light grey professional studio background, hex color #E5E5E5, soft shadows";
+  const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
   const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   if (shotIndex === 0) {
