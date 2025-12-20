@@ -74,13 +74,32 @@ async function loadUserKeys(req, res, next) {
 
 // --- CONTROLLERS ---
 
+// Add to top imports if not redundant
+const { sendWelcomeEmail } = require('./emailClient');
+
 async function register(req, res) {
     try {
-        const { email, password } = req.body;
+        const { email, password, first_name, last_name, company_name } = req.body;
+
         if (!email || !password) return res.status(400).send('Email and Password required');
+        if (!first_name || !last_name || !company_name) return res.status(400).send('Name and Company are required');
+
+        // Check if user exists first? Sequelize Unique constraint handles it but nice to check.
+        const existing = await User.findOne({ where: { email } });
+        if (existing) return res.status(409).send("User already exists");
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await User.create({ email, password_hash: hashedPassword });
+
+        const user = await User.create({
+            email,
+            password_hash: hashedPassword,
+            first_name,
+            last_name,
+            company_name
+        });
+
+        // Send Welcome Email
+        sendWelcomeEmail(email, first_name).catch(console.error);
 
         res.status(201).json({ message: 'User created' });
     } catch (err) {

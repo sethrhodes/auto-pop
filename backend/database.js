@@ -25,6 +25,18 @@ const User = sequelize.define('User', {
     password_hash: {
         type: DataTypes.STRING,
         allowNull: false
+    },
+    first_name: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    last_name: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    company_name: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 });
 
@@ -109,7 +121,7 @@ function decrypt(hash) {
 async function initDB() {
     try {
         await sequelize.authenticate();
-        await sequelize.sync(); // Create tables if not exist
+        await sequelize.sync({ alter: true }); // Create or Update tables
         console.log('Database connected and synced.');
     } catch (error) {
         console.error('Unable to connect to the database:', error);

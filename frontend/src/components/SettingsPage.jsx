@@ -76,15 +76,34 @@ export default function SettingsPage() {
         return savedKeys[keyName] ? "Type to replace saved secret..." : "Enter new value...";
     };
 
-    // Helper for Saved Badge
     const SavedBadge = () => (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
             Saved
         </span>
     );
 
+    // Check critical keys
+    const missingCriticalKeys = !savedKeys.IMAGE_API_KEY || !savedKeys.OPENAI_API_KEY || !savedKeys.WC_BASE_URL;
+
     return (
         <div className="p-4 sm:p-8 max-w-4xl mx-auto">
+
+            {missingCriticalKeys && (
+                <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-8 rounded-r-lg shadow-sm">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-amber-700">
+                                <strong className="font-bold">Account Setup Required:</strong> Please enter your API keys below to enable Auto-Pop features.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Account Section */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">

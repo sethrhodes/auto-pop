@@ -50,14 +50,17 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem("user", JSON.stringify(data.user));
     };
 
-    const register = async (email, password) => {
+    const register = async (email, password, extras = {}) => {
         const BACKEND_URL = `http://${window.location.hostname}:3000`;
         const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email, password, ...extras }),
         });
-        if (!res.ok) throw new Error("Registration failed");
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(txt || "Registration failed");
+        }
     };
 
     const logout = () => {

@@ -6,6 +6,9 @@ import { useNavigate } from "react-router-dom";
 export default function LoginPage() {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
+    const [first_name, setFirstName] = useState("");
+    const [last_name, setLastName] = useState("");
+    const [company_name, setCompanyName] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const { login, register } = useAuth();
@@ -19,10 +22,10 @@ export default function LoginPage() {
                 await login(email, password);
                 navigate("/");
             } else {
-                await register(email, password);
-                // Auto login after register or ask to login? Let's just switch to login mode.
-                alert("Registration successful! Please log in.");
-                setIsLogin(true);
+                await register(email, password, { first_name, last_name, company_name });
+                // Auto-login after registration
+                await login(email, password);
+                navigate("/settings"); // Redirect to settings for onboarding
             }
         } catch (err) {
             setError(err.message);
@@ -43,6 +46,43 @@ export default function LoginPage() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {!isLogin && (
+                        <>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">First Name</label>
+                                    <input
+                                        type="text"
+                                        value={first_name}
+                                        onChange={(e) => setFirstName(e.target.value)}
+                                        className="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                                    <input
+                                        type="text"
+                                        value={last_name}
+                                        onChange={(e) => setLastName(e.target.value)}
+                                        className="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Company Name</label>
+                                <input
+                                    type="text"
+                                    value={company_name}
+                                    onChange={(e) => setCompanyName(e.target.value)}
+                                    className="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    required
+                                />
+                            </div>
+                        </>
+                    )}
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Email</label>
                         <input
