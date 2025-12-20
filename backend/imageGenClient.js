@@ -67,14 +67,14 @@ async function uploadToClaid(filePath, apiKey) {
 /**
  * Helper to start a Claid generation task with retries for 429
  */
-async function triggerClaidGeneration(taskId, imageUrl, pose, aspectRatio = "3:4", apiKey) {
+async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio = "3:4", apiKey) {
   const payload = {
     input: {
       clothing: [imageUrl] // Send only the specific side
     },
     options: {
       pose: pose,
-      background: "minimalistic studio background, ecommerce product photography, soft even lighting",
+      background: backgroundPrompt,
       aspect_ratio: aspectRatio
     },
   };
@@ -175,34 +175,37 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
   // --- PROMPT LOGIC ---
   const isBottom = category === "bottom";
 
-  // Shot 1 Prompts
+  // Shot 1 Prompts (Pose Only)
   const shot1Prompt = isBottom
-    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus, neutral background, studio lighting`
-    : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, white background, studio lighting`;
+    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus`
+    : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view`;
 
-  // Shot 2 Prompts
+  // Shot 2 Prompts (Pose Only)
   const shot2Prompt = isBottom
-    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus, neutral background, studio lighting`
-    : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, white background, studio lighting`;
+    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus`
+    : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view`;
 
-  // Shot 3 Prompts (Lifestyle)
+  // Shot 3 Prompts (Lifestyle Pose)
   const shot3Prompt = isBottom
-    ? `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, full body shot walking away, focus on pants/shorts, wearing the clothing, cinematic lighting`
-    : `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`;
+    ? `lifestyle photography of single ${modelTerm} walking away, focus on pants/shorts, wearing the clothing`
+    : `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing`;
 
+  // Backgrounds
+  const WHITE_BG = "solid plain white background, high key studio lighting";
+  const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   // 2. Trigger Sequential Model Generations (3 Shots)
 
   // Shot 1: Front
-  const task1 = await triggerClaidGeneration("SHOT_1", frontUrl, shot1Prompt, "3:4", apiKey);
+  const task1 = await triggerClaidGeneration("SHOT_1", frontUrl, shot1Prompt, WHITE_BG, "3:4", apiKey);
   const url1 = await pollClaidTask("SHOT_1", task1.result_url, apiKey);
 
   // Shot 2: Back
-  const task2 = await triggerClaidGeneration("SHOT_2", backUrl, shot2Prompt, "3:4", apiKey);
+  const task2 = await triggerClaidGeneration("SHOT_2", backUrl, shot2Prompt, WHITE_BG, "3:4", apiKey);
   const url2 = await pollClaidTask("SHOT_2", task2.result_url, apiKey);
 
   // Shot 3: Lifestyle
-  const task3 = await triggerClaidGeneration("SHOT_3", frontUrl, shot3Prompt, "3:4", apiKey);
+  const task3 = await triggerClaidGeneration("SHOT_3", frontUrl, shot3Prompt, BEACH_BG, "3:4", apiKey);
   const url3 = await pollClaidTask("SHOT_3", task3.result_url, apiKey);
 
   return {
@@ -246,34 +249,35 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   const isBottom = category === "bottom";
 
   let task, taskId;
+  const WHITE_BG = "solid plain white background, high key studio lighting";
+  const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
 
   if (shotIndex === 0) {
     // Shot 1: Front
     taskId = "REGEN_SHOT_1";
     const prompt = isBottom
-      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus, neutral background, studio lighting`
-      : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, neutral background, studio lighting`;
+      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus`
+      : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view`;
 
-    task = await triggerClaidGeneration(taskId, frontUrl, prompt, SHOT_ASPECT_RATIO, apiKey);
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, WHITE_BG, SHOT_ASPECT_RATIO, apiKey);
 
   } else if (shotIndex === 1) {
     // Shot 2: Back
     taskId = "REGEN_SHOT_2";
     const prompt = isBottom
-      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus, neutral background, studio lighting`
-      : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, neutral background, studio lighting`;
+      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus`
+      : `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view`;
 
-    task = await triggerClaidGeneration(taskId, backUrl, prompt, SHOT_ASPECT_RATIO, apiKey);
+    task = await triggerClaidGeneration(taskId, backUrl, prompt, WHITE_BG, SHOT_ASPECT_RATIO, apiKey);
 
   } else if (shotIndex === 2) {
     // Shot 3: Lifestyle
     taskId = "REGEN_SHOT_3";
     const prompt = isBottom
-      ? `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, full body shot walking away, focus on pants/shorts, wearing the clothing, cinematic lighting`
-      : `lifestyle photography of single ${modelTerm} standing on a rugged northern california beach, misty cliffs in background, moody atmosphere, looks like a surfer, messy hair, wearing the clothing, cinematic lighting`;
+      ? `lifestyle photography of single ${modelTerm} walking away, focus on pants/shorts, wearing the clothing`
+      : `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing`;
 
-    task = await triggerClaidGeneration(taskId, frontUrl, prompt, SHOT_ASPECT_RATIO, apiKey);
-
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, BEACH_BG, SHOT_ASPECT_RATIO, apiKey);
   } else {
     throw new Error("Invalid shotIndex (0-2)");
   }
