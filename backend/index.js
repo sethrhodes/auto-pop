@@ -187,7 +187,6 @@ app.post("/api/regenerate-image", authenticateToken, loadUserKeys, async (req, r
       category,
       isHooded,
       apiKeys: req.userKeys
-      apiKeys: req.userKeys
     });
     res.json(result);
   } catch (err) {
