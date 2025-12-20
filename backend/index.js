@@ -22,8 +22,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads (for frontend preview)
+// Serve static files from uploads (for frontend preview)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use(express.static(path.join(__dirname, "public")));
 
 // SERVE FRONTEND (Production)
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
