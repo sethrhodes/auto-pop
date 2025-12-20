@@ -398,7 +398,12 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
 
 // SPA Catch-all (for React Router)
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
+  const indexPath = path.join(__dirname, "../frontend/dist", "index.html");
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send("Frontend build not found. Please run 'npm run build' in the frontend directory.");
+  }
 });
 
 // START SERVER
