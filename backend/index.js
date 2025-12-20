@@ -245,6 +245,33 @@ app.post("/api/products", authenticateToken, async (req, res) => {
       }
     }
 
+    // If no ID provided, or ID not found, check if a draft with this SKU already exists
+    if (!savedProduct && product.sku) {
+      const existingBySku = await Product.findOne({
+        where: {
+          sku: product.sku,
+          user_id: req.user.id,
+          status: 'draft' // Only overwrite drafts, not published history? Or both? User said "draft".
+        }
+      });
+
+      if (existingBySku) {
+        console.log(`Found existing draft for SKU ${product.sku}, updating...`);
+        await existingBySku.update({
+          name: product.name,
+          price: product.price,
+          description: product.description,
+          short_description: product.short_description,
+          gallery: JSON.stringify(product.gallery || []),
+          image_url: mainImage,
+          variants: product.variants ? JSON.stringify(product.variants) : null,
+          front_image: product.front_image,
+          back_image: product.back_image
+        });
+        savedProduct = existingBySku;
+      }
+    }
+
     if (!savedProduct) {
       savedProduct = await Product.create({
         user_id: req.user.id,
