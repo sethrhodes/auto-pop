@@ -243,7 +243,10 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
 
   // 2. Trigger PARALLEL Model Generations (3 Shots)
   console.log("Starting parallel generation for 3 shots...");
-  const [url1, url2, url3] = await Promise.all([
+  // 2. Trigger PARALLEL Model Generations (3 Shots)
+  console.log("Starting parallel generation for 3 shots...");
+
+  const results = await Promise.allSettled([
     // Shot 1: Front
     runGenerationTask("SHOT_1", frontUrl, shot1Prompt, STANDARD_BG, "3:4", apiKey),
 
@@ -254,11 +257,28 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
     runGenerationTask("SHOT_3", frontUrl, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl)
   ]);
 
+  // Helper to safely get URL or null
+  const getResultUrl = (result, label) => {
+    if (result.status === 'fulfilled') return result.value;
+    console.error(`[${label}] Generation Failed:`, result.reason);
+    return null; // Frontend should handle null (or show error placeholder)
+  };
+
+  const url1 = getResultUrl(results[0], "SHOT_1");
+  const url2 = getResultUrl(results[1], "SHOT_2");
+  const url3 = getResultUrl(results[2], "SHOT_3");
+
+  // If ALL failed, then throw error to frontend
+  if (!url1 && !url2 && !url3) {
+    const errorMessages = results.map(r => r.reason?.message).join("; ");
+    throw new Error(`All image generations failed: ${errorMessages}`);
+  }
+
   return {
     gallery: [
-      { label: "Front Detail", url: url1 },
-      { label: "Back Detail", url: url2 },
-      { label: "Beach Lifestyle", url: url3 }
+      { label: "Front Detail", url: url1 || "https://placehold.co/600x800?text=Generation+Failed" },
+      { label: "Back Detail", url: url2 || "https://placehold.co/600x800?text=Generation+Failed" },
+      { label: "Beach Lifestyle", url: url3 || "https://placehold.co/600x800?text=Generation+Failed" }
     ]
   };
 }
