@@ -80,10 +80,9 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, 
   };
 
   if (customBgUrl) {
-    // Attempt: Pass URL directly to 'background' field. 
-    // Many GenAI APIs treat a URL in 'background' as "Use this image".
-    console.log(`[${taskId}] Using custom background URL: ${customBgUrl}`);
-    payload.options.background = customBgUrl;
+    console.log(`[${taskId}] Note: Custom background image URL provided (${customBgUrl}) but API only supports text prompts. Using prompt: "${backgroundPrompt}"`);
+    // We DO NOT overwrite 'background' with the URL, as it breaks generation (treats URL as text).
+    // We rely on 'backgroundPrompt' which should be descriptive (e.g. "rugged beach...").
   }
 
   const maxRetries = 3;
@@ -199,14 +198,14 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
   const getTopPrompts = (view, hoodState) => {
     if (!isHooded) {
       // Non-Hooded (T-Shirt / Crewneck)
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, back view`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, back view, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt, preserve clothing details, sharp text, high fidelity texture`;
     } else {
       // Hooded (Default)
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
 
@@ -318,13 +317,13 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   // Re-define helper inside scope (or could move out)
   const getTopPrompts = (view) => {
     if (!isHooded) {
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, back view`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, back view, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt, preserve clothing details, sharp text, high fidelity texture`;
     } else {
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
 
