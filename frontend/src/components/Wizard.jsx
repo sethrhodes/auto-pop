@@ -24,6 +24,7 @@ function Wizard() {
 
   // Intermediate Loading State
   const [generatingProgress, setGeneratingProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("Initializing...");
 
   // Load existing draft if productId present
   useEffect(() => {
@@ -157,6 +158,7 @@ function Wizard() {
       // Start Loading Screen
       setStep(1.5);
       setGeneratingProgress(10);
+      setStatusMessage("Uploading images...");
 
       // 2. Call Draft API (Fast)
       const draftRes = await fetch(`${BACKEND_URL}/api/draft`, {
@@ -177,9 +179,26 @@ function Wizard() {
       setGeneratingProgress(30);
 
       // 3. Call Image Generation API (Slow)
-      // We start a timer to fake progress filling up to 90% while waiting
+      // Status Message Cycle
+      const messages = [
+        "Analyzing fabric geometry...",
+        "Identifying style traits...",
+        "Preparing virtual studio...",
+        "Generating detail shots...",
+        "Rendering lifestyle scene...",
+        "Polishing final images..."
+      ];
+      let msgIdx = 0;
+      setStatusMessage(messages[0]);
+
       const progressTimer = setInterval(() => {
-        setGeneratingProgress(old => (old < 90 ? old + 1 : 90));
+        setGeneratingProgress(old => (old < 90 ? old + 2 : 95));
+
+        // Cycle messages every ~3 ticks (~2.1s)
+        if (Math.random() > 0.7) {
+          msgIdx = (msgIdx + 1) % messages.length;
+          setStatusMessage(messages[msgIdx]);
+        }
       }, 700);
 
       const genRes = await fetch(`${BACKEND_URL}/api/generate-images`, {
@@ -200,6 +219,7 @@ function Wizard() {
 
       clearInterval(progressTimer);
       setGeneratingProgress(100);
+      setStatusMessage("Finalizing...");
 
       if (!genRes.ok) throw new Error(genData.error || "Image generation failed");
 
@@ -293,7 +313,8 @@ function Wizard() {
                   style={{ width: `${generatingProgress}%` }}
                 ></div>
               </div>
-              <p className="text-gray-500 text-sm">Analyzing Styles • Generating Photoshoot • Writing Copy</p>
+              <p className="text-gray-600 font-medium text-lg animate-fade-in-up">{statusMessage}</p>
+              <p className="text-gray-400 text-sm mt-2">This usually takes about 30-45 seconds.</p>
             </div>
           )}
 
