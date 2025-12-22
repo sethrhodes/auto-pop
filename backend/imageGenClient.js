@@ -227,7 +227,7 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
   // Backgrounds
   // User requested "light grey" specifically.
   const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
-  const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
+  const BEACH_BG = "rugged northern california beach on a sunny day, bright natural lighting, blue sky, cliffs in background, cinematic";
 
   // Check for Custom Background File
   let customBgUrl = null;
@@ -329,7 +329,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
 
   let task, taskId;
   const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
-  const BEACH_BG = "rugged northern california beach, misty cliffs in background, moody atmosphere, cinematic lighting";
+  const BEACH_BG = "rugged northern california beach on a sunny day, bright natural lighting, blue sky, cliffs in background, cinematic";
 
   // Check for Custom Background File
   let customBgUrl = null;
