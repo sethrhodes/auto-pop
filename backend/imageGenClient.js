@@ -153,6 +153,15 @@ async function pollClaidTask(taskId, resultUrl, apiKey) {
   throw new Error(`[${taskId}] Timed out`);
 }
 
+/**
+ * Helper to run a full generation cycle (Trigger + Poll)
+ */
+async function runGenerationTask(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl = null) {
+  const task = await triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl);
+  const url = await pollClaidTask(taskId, task.result_url, apiKey);
+  return url;
+}
+
 async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "female", category = "top", isHooded = true, apiKeys = {} }) {
   const apiKey = apiKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY;
   if (!apiKey) {
@@ -232,20 +241,18 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
     }
   }
 
-  // 2. Trigger Sequential Model Generations (3 Shots)
+  // 2. Trigger PARALLEL Model Generations (3 Shots)
+  console.log("Starting parallel generation for 3 shots...");
+  const [url1, url2, url3] = await Promise.all([
+    // Shot 1: Front
+    runGenerationTask("SHOT_1", frontUrl, shot1Prompt, STANDARD_BG, "3:4", apiKey),
 
-  // Shot 1: Front
-  const task1 = await triggerClaidGeneration("SHOT_1", frontUrl, shot1Prompt, STANDARD_BG, "3:4", apiKey);
-  const url1 = await pollClaidTask("SHOT_1", task1.result_url, apiKey);
+    // Shot 2: Back
+    runGenerationTask("SHOT_2", backUrl, shot2Prompt, STANDARD_BG, "3:4", apiKey),
 
-  // Shot 2: Back
-  const task2 = await triggerClaidGeneration("SHOT_2", backUrl, shot2Prompt, STANDARD_BG, "3:4", apiKey);
-  const url2 = await pollClaidTask("SHOT_2", task2.result_url, apiKey);
-
-  // Shot 3: Lifestyle
-  // Use customBgUrl if available
-  const task3 = await triggerClaidGeneration("SHOT_3", frontUrl, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl);
-  const url3 = await pollClaidTask("SHOT_3", task3.result_url, apiKey);
+    // Shot 3: Lifestyle
+    runGenerationTask("SHOT_3", frontUrl, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl)
+  ]);
 
   return {
     gallery: [
