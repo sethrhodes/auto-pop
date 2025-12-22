@@ -80,13 +80,10 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, 
   };
 
   if (customBgUrl) {
-    // If a custom background image is provided, pass it.
-    // Note: API field might be 'background_image' or 'background_image_url'.
-    // We'll try 'background_image_url' and also 'background_image' to be safe or just one common one.
-    // Standard Claid/similar convention often prefers 'background_image'.
-    payload.options.background_image_url = customBgUrl;
-    // We keep 'background' (prompt) as fallback or hint, or remove it?
-    // Usually explicit image overrides prompt.
+    // Attempt: Pass URL directly to 'background' field. 
+    // Many GenAI APIs treat a URL in 'background' as "Use this image".
+    console.log(`[${taskId}] Using custom background URL: ${customBgUrl}`);
+    payload.options.background = customBgUrl;
   }
 
   const maxRetries = 3;
@@ -109,6 +106,10 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, 
       return task;
 
     } catch (err) {
+      if (err.response) {
+        console.error(`[${taskId}] Claid API Error (${err.response.status}):`, JSON.stringify(err.response.data, null, 2));
+      }
+
       if (err.response && err.response.status === 429) {
         console.warn(`[${taskId}] Rate limited (429). Retrying in 5s...`);
         await sleep(5000 * (attempt + 1)); // Backoff: 5s, 10s, 15s
