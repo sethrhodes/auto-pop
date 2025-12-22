@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const FormData = require("form-data");
+const { extractText } = require("./ocrClient");
 require("dotenv").config();
 
 const IMAGE_API_URL =

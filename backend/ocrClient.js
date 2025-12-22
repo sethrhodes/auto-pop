@@ -6,16 +6,16 @@ const FormData = require("form-data");
 const sharp = require("sharp");
 require("dotenv").config();
 
-async function extractTagText({ tagFilename, apiKeys = {} }) {
+async function extractText({ filename, apiKeys = {} }) {
   const apiKey = apiKeys.OCR_API_KEY || process.env.OCR_API_KEY;
   const apiUrl = process.env.OCR_API_URL || "https://api.ocr.space/parse/image";
 
   // Fallback if no key provided
   const resolvedKey = apiKey || 'helloworld';
 
-  const filePath = path.join(__dirname, "uploads", tagFilename);
+  const filePath = path.join(__dirname, "uploads", filename);
   if (!fs.existsSync(filePath)) {
-    throw new Error("Tag image not found");
+    throw new Error(`File not found: ${filename}`);
   }
 
   try {
@@ -27,7 +27,7 @@ async function extractTagText({ tagFilename, apiKeys = {} }) {
 
     const form = new FormData();
     // Pass buffer with filename and contentType options
-    form.append("file", resizedBuffer, { filename: "tag.jpg", contentType: "image/jpeg" });
+    form.append("file", resizedBuffer, { filename: "image.jpg", contentType: "image/jpeg" });
     form.append("language", "eng");
     form.append("isOverlayRequired", "false");
     form.append("apikey", resolvedKey);
@@ -49,8 +49,6 @@ async function extractTagText({ tagFilename, apiKeys = {} }) {
     }
 
     const rawText = parsedResults[0].ParsedText;
-    // console.log("OCR Raw:", rawText);
-
     return { rawText };
 
   } catch (error) {
@@ -59,4 +57,7 @@ async function extractTagText({ tagFilename, apiKeys = {} }) {
   }
 }
 
-module.exports = { extractTagText };
+// Alias for backward compatibility
+const extractTagText = ({ tagFilename, apiKeys }) => extractText({ filename: tagFilename, apiKeys });
+
+module.exports = { extractText, extractTagText };
