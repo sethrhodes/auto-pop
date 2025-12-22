@@ -292,19 +292,18 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
             {/* Lightbox Modal */}
             {selectedImage && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setSelectedImage(null)}>
-                    <div className="relative max-w-5xl max-h-[90vh] w-full flex items-center justify-center">
+                    <div className="relative max-w-5xl max-h-[90vh] w-fit">
                         <img
                             src={selectedImage}
                             alt="Full Size"
                             className="max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
-                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image itself? Or allow it? User said "close out of it". 
-                        // Usually clicking background closes. Let's keep it simple.
+                            onClick={(e) => e.stopPropagation()}
                         />
                         <button
                             onClick={() => setSelectedImage(null)}
-                            className="absolute -top-12 right-0 text-white hover:text-gray-300 z-50 p-2"
+                            className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/70 rounded-full p-2 backdrop-blur-sm transition-colors"
                         >
-                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
