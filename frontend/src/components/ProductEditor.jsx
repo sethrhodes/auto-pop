@@ -20,6 +20,7 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
     const [aiGallery, setAiGallery] = useState([]); // [{ label, url }]
     const [regeneratingIndex, setRegeneratingIndex] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null); // For Lightbox
 
     // Initialize Data from Draft
     useEffect(() => {
@@ -163,7 +164,8 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
                                     <img
                                         src={img.url}
                                         alt={img.label}
-                                        className={`w-full h-full object-cover transition-opacity duration-300 ${regeneratingIndex === idx ? 'opacity-50' : ''}`}
+                                        onClick={() => setSelectedImage(img.url)}
+                                        className={`w-full h-full object-cover transition-opacity duration-300 cursor-zoom-in ${regeneratingIndex === idx ? 'opacity-50' : ''}`}
                                     />
 
 
@@ -287,6 +289,28 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
                 </div>
 
             </div>
+            {/* Lightbox Modal */}
+            {selectedImage && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setSelectedImage(null)}>
+                    <div className="relative max-w-5xl max-h-[90vh] w-full flex items-center justify-center">
+                        <img
+                            src={selectedImage}
+                            alt="Full Size"
+                            className="max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
+                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image itself? Or allow it? User said "close out of it". 
+                        // Usually clicking background closes. Let's keep it simple.
+                        />
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 text-white hover:text-gray-300 z-50 p-2"
+                        >
+                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
