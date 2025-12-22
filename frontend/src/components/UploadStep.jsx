@@ -56,6 +56,36 @@ export default function UploadStep({ onNext, isLoading }) {
                     ))}
                 </div>
 
+                <div className="mb-8">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Logo / Detail Close-up (Optional)
+                    </label>
+                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-indigo-500 transition-colors bg-white">
+                        <div className="space-y-1 text-center">
+                            {images.logo ? (
+                                <div className="relative">
+                                    <p className="text-sm text-green-600 font-semibold">{images.logo.name}</p>
+                                    <button type="button" onClick={() => handleFileChange({ target: { files: [] } }, 'logo')} className="text-xs text-red-500 underline mt-1">Remove</button>
+                                </div>
+                            ) : (
+                                <>
+                                    <svg className="mx-auto h-8 w-8 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                    <div className="flex text-sm text-gray-600 justify-center mt-2">
+                                        <label htmlFor="logo-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                            <span>Upload detail shot</span>
+                                            <input id="logo-upload" name="logo-upload" type="file" className="sr-only" onChange={(e) => handleFileChange(e, 'logo')} accept="image/*" />
+                                        </label>
+                                    </div>
+                                    <p className="text-xs text-gray-500">PNG, JPG, HEIC up to 10MB</p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Upload a close-up of the logo or embroidery to ensure text sharpness.</p>
+                </div>
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         Product Category
