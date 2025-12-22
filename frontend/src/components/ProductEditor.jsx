@@ -171,11 +171,11 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
 
 
                                     {/* Regenerate Button (Visible on Mobile, Hover on Desktop) */}
-                                    <div className="absolute inset-0 flex items-end justify-center pb-4 transition-opacity bg-black/10 opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+                                    <div className="absolute inset-0 flex items-end justify-center pb-4 transition-opacity bg-black/10 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 pointer-events-none">
                                         <button
                                             onClick={() => handleRegenerate(idx)}
                                             disabled={regeneratingIndex !== null}
-                                            className="bg-white text-gray-900 px-4 py-2 rounded-full shadow-lg font-bold text-sm flex items-center gap-2 hover:scale-105 transition-transform active:scale-95"
+                                            className="bg-white text-gray-900 px-4 py-2 rounded-full shadow-lg font-bold text-sm flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 pointer-events-auto"
                                         >
                                             {regeneratingIndex === idx ? (
                                                 <>
