@@ -70,7 +70,7 @@ async function uploadToClaid(filePath, apiKey) {
 async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio = "3:4", apiKey, customBgUrl = null) {
   const payload = {
     input: {
-      clothing: [imageUrl] // Send only the specific side
+      clothing: Array.isArray(imageUrl) ? imageUrl : [imageUrl] // Support single URL or Array
     },
     options: {
       pose: pose,
@@ -162,7 +162,7 @@ async function runGenerationTask(taskId, imageUrl, pose, backgroundPrompt, aspec
   return url;
 }
 
-async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "female", category = "top", isHooded = true, apiKeys = {} }) {
+async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilename = null, gender = "female", category = "top", isHooded = true, apiKeys = {} }) {
   const apiKey = apiKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY;
   if (!apiKey) {
     throw new Error("IMAGE_API_KEY missing (Check Settings or .env)");
@@ -178,6 +178,15 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
     uploadToClaid(frontPath, apiKey),
     uploadToClaid(backPath, apiKey),
   ]);
+
+  let logoUrl = null;
+  if (logoFilename) {
+    const logoPath = path.join(__dirname, "uploads", logoFilename);
+    if (fs.existsSync(logoPath)) {
+      console.log("Uploading logo file for fidelity...");
+      logoUrl = await uploadToClaid(logoPath, apiKey);
+    }
+  }
 
   // Determine model terms
   let modelTerm = "female model";
@@ -241,20 +250,22 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, gender = "
     }
   }
 
-  // 2. Trigger PARALLEL Model Generations (3 Shots)
-  console.log("Starting parallel generation for 3 shots...");
+  // Prepare Inputs (Front shot includes logo if available)
+  const frontInput = logoUrl ? [frontUrl, logoUrl] : frontUrl;
+  const backInput = backUrl; // Backshot usually doesn't need the logo unless it's on back. Assuming front logo for now.
+
   // 2. Trigger PARALLEL Model Generations (3 Shots)
   console.log("Starting parallel generation for 3 shots...");
 
   const results = await Promise.allSettled([
     // Shot 1: Front
-    runGenerationTask("SHOT_1", frontUrl, shot1Prompt, STANDARD_BG, "3:4", apiKey),
+    runGenerationTask("SHOT_1", frontInput, shot1Prompt, STANDARD_BG, "3:4", apiKey),
 
     // Shot 2: Back
-    runGenerationTask("SHOT_2", backUrl, shot2Prompt, STANDARD_BG, "3:4", apiKey),
+    runGenerationTask("SHOT_2", backInput, shot2Prompt, STANDARD_BG, "3:4", apiKey),
 
     // Shot 3: Lifestyle
-    runGenerationTask("SHOT_3", frontUrl, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl)
+    runGenerationTask("SHOT_3", frontInput, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl)
   ]);
 
   // Helper to safely get URL or null

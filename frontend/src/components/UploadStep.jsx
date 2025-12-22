@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 export default function UploadStep({ onNext, isLoading }) {
-    const [images, setImages] = useState({ front: null, back: null, tag: null });
+    const [images, setImages] = useState({ front: null, back: null, tag: null, logo: null });
     const [gender, setGender] = useState('men');
     const [category, setCategory] = useState('top');
     const [isHooded, setIsHooded] = useState(true);
