@@ -63,6 +63,17 @@ async function createTestProduct(apiKeys) {
  */
 async function createProduct({ name, price, sku, quantity = 1, description, short_description, images = [], gender, category, isHooded, variants = [], apiKeys = {} }) {
   const api = getWooClient(apiKeys);
+
+  // Default to S-XXL if no variants provided
+  if (!variants || variants.length === 0) {
+    const sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+    variants = sizes.map(size => ({
+      size: size,
+      qty: 1,
+      sku: `${sku}${size}`
+    }));
+  }
+
   const isVariable = Array.isArray(variants) && variants.length > 0;
 
   const payload = {
