@@ -385,7 +385,7 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
         gender: product.gender,
         category: product.category,
         isHooded: product.isHooded
-        isHooded: product.isHooded
+
       }, req.userKeys);
     } else {
       // CREATE New Woo Product
