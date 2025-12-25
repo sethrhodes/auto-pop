@@ -279,8 +279,6 @@ function Wizard() {
             }
           };
 
-          console.log("Publish Payload ID:", payload.product.id);
-
           const res = await fetch(`${BACKEND_URL}/api/publish`, {
             method: 'POST',
             headers: {
