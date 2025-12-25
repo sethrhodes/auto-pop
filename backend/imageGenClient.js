@@ -70,133 +70,35 @@ async function uploadToClaid(filePath, apiKey) {
  */
 async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio = "3:4", apiKey, customBgUrl = null) {
   const payload = {
-    const payload = {
-      input: {
-        clothing: Array.isArray(imageUrl) ? imageUrl : [imageUrl]
-      },
-      options: {
-        pose: pose,
-        background: backgroundPrompt,
-        aspect_ratio: aspectRatio
-      },
-    };
+    input: {
+      clothing: Array.isArray(imageUrl) ? imageUrl : [imageUrl]
+    },
+    options: {
+      pose: pose,
+      background: backgroundPrompt,
+      aspect_ratio: aspectRatio
+    },
+  };
 
-    if(customBgUrl) {
-      console.log(`[${taskId}] Note: Custom background image URL provided (${customBgUrl}) but API only supports text prompts. Using prompt: "${backgroundPrompt}"`);
-      // We DO NOT overwrite 'background' with the URL, as it breaks generation (treats URL as text).
-      // We rely on 'backgroundPrompt' which should be descriptive (e.g. "rugged beach...").
-    }
+  if (customBgUrl) {
+    console.log(`[${taskId}] Note: Custom background image URL provided (${customBgUrl}) but API only supports text prompts. Using prompt: "${backgroundPrompt}"`);
+    // We DO NOT overwrite 'background' with the URL, as it breaks generation (treats URL as text).
+    // We rely on 'backgroundPrompt' which should be descriptive (e.g. "rugged beach...").
+  }
 
   const maxRetries = 3;
-    let attempt = 0;
+  let attempt = 0;
 
-    while(attempt <maxRetries) {
-      try {
-        console.log(`[${taskId}] Triggering Claid generation (attempt ${attempt + 1})...`);
-        const res = await axios.post(IMAGE_API_URL, payload, {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        const task = res.data?.data;
-        if (!task || !task.result_url) {
-          throw new Error(`[${taskId}] Claid response missing result_url`);
-        }
-        return task;
-
-      } catch (err) {
-        if (err.response) {
-          console.error(`[${taskId}] Claid API Error (${err.response.status}):`, JSON.stringify(err.response.data, null, 2));
-        }
-
-        if (err.response && err.response.status === 429) {
-          console.warn(`[${taskId}] Rate limited (429). Retrying in 5s...`);
-          await sleep(5000 * (attempt + 1)); // Backoff: 5s, 10s, 15s
-          attempt++;
-        } else {
-          throw err; // Rethrow other errors
-        }
-      }
-    }
-  throw new Error(`[${taskId}] Failed after ${maxRetries} retries (Rate Limit)`);
-  }
-
-  /**
-   * Poll a single Claid task until completion
-   */
-  async function pollClaidTask(taskId, resultUrl, apiKey) {
-    const maxAttempts = 20;
-    const delayMs = 3000;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      await sleep(delayMs);
-
-      const res = await axios.get(resultUrl, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+  while (attempt < maxRetries) {
+    try {
+      console.log(`[${taskId}] Triggering Claid generation (attempt ${attempt + 1})...`);
+      const res = await axios.post(IMAGE_API_URL, payload, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
       });
 
-      const status = res.data?.data?.status;
-      console.log(`[${taskId}] Poll attempt ${attempt}: ${status}`);
-
-      if (status === "DONE") {
-        const output = res.data?.data?.result?.output_objects?.[0];
-        const url = output?.tmp_url || output?.claid_storage_uri;
-        if (!url) throw new Error(`[${taskId}] DONE but no output URL`);
-        return url;
-      }
-
-      if (status === "ERROR") {
-        const errs = JSON.stringify(res.data?.data?.errors || []);
-        throw new Error(`[${taskId}] Failed: ${errs}`);
-      }
-    }
-    throw new Error(`[${taskId}] Timed out`);
-  }
-
-  /**
-   * Helper to run a full generation cycle (Trigger + Poll)
-   */
-  async function runGenerationTask(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl = null) {
-    const task = await triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl);
-    const url = await pollClaidTask(taskId, task.result_url, apiKey);
-    return url;
-  }
-
-  async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilename = null, gender = "female", category = "top", isHooded = true, apiKeys = {} }) {
-    const apiKey = apiKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY;
-    if (!apiKey) {
-      throw new Error("IMAGE_API_KEY missing (Check Settings or .env)");
-    }
-
-    const frontPath = path.join(__dirname, "uploads", frontFilename);
-    const backPath = path.join(__dirname, "uploads", backFilename);
-
-    if (!fs.existsSync(frontPath)) throw new Error(`Front not found: ${frontPath}`);
-    if (!fs.existsSync(backPath)) throw new Error(`Back not found: ${backPath}`);
-
-    const [frontUrl, backUrl] = await Promise.all([
-      uploadToClaid(frontPath, apiKey),
-      uploadToClaid(backPath, apiKey),
-    ]);
-
-    let logoUrl = null;
-    if (logoFilename) {
-      const logoPath = path.join(__dirname, "uploads", logoFilename);
-      if (fs.existsSync(logoPath)) {
-        console.log("Uploading logo file for fidelity...");
-        logoUrl = await uploadToClaid(logoPath, apiKey);
-      }
-    }
-
-    // Determine model terms
-    let modelTerm = "female model";
-    if (gender === "men") {
-      modelTerm = "male model";
-    } else if (gender === "kids") {
-      modelTerm = "child model";
-    } else if (gender === "womens" || gender === "women") {
       const task = res.data?.data;
       if (!task || !task.result_url) {
         throw new Error(`[${taskId}] Claid response missing result_url`);
@@ -218,6 +120,103 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, 
     }
   }
   throw new Error(`[${taskId}] Failed after ${maxRetries} retries (Rate Limit)`);
+}
+
+/**
+ * Poll a single Claid task until completion
+ */
+async function pollClaidTask(taskId, resultUrl, apiKey) {
+  const maxAttempts = 20;
+  const delayMs = 3000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await sleep(delayMs);
+
+    const res = await axios.get(resultUrl, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    const status = res.data?.data?.status;
+    console.log(`[${taskId}] Poll attempt ${attempt}: ${status}`);
+
+    if (status === "DONE") {
+      const output = res.data?.data?.result?.output_objects?.[0];
+      const url = output?.tmp_url || output?.claid_storage_uri;
+      if (!url) throw new Error(`[${taskId}] DONE but no output URL`);
+      return url;
+    }
+
+    if (status === "ERROR") {
+      const errs = JSON.stringify(res.data?.data?.errors || []);
+      throw new Error(`[${taskId}] Failed: ${errs}`);
+    }
+  }
+  throw new Error(`[${taskId}] Timed out`);
+}
+
+/**
+ * Helper to run a full generation cycle (Trigger + Poll)
+ */
+async function runGenerationTask(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl = null) {
+  const task = await triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl);
+  const url = await pollClaidTask(taskId, task.result_url, apiKey);
+  return url;
+}
+
+async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilename = null, gender = "female", category = "top", isHooded = true, apiKeys = {} }) {
+  const apiKey = apiKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY;
+  if (!apiKey) {
+    throw new Error("IMAGE_API_KEY missing (Check Settings or .env)");
+  }
+
+  const frontPath = path.join(__dirname, "uploads", frontFilename);
+  const backPath = path.join(__dirname, "uploads", backFilename);
+
+  if (!fs.existsSync(frontPath)) throw new Error(`Front not found: ${frontPath}`);
+  if (!fs.existsSync(backPath)) throw new Error(`Back not found: ${backPath}`);
+
+  const [frontUrl, backUrl] = await Promise.all([
+    uploadToClaid(frontPath, apiKey),
+    uploadToClaid(backPath, apiKey),
+  ]);
+
+  let logoUrl = null;
+  if (logoFilename) {
+    const logoPath = path.join(__dirname, "uploads", logoFilename);
+    if (fs.existsSync(logoPath)) {
+      console.log("Uploading logo file for fidelity...");
+      logoUrl = await uploadToClaid(logoPath, apiKey);
+    }
+  }
+
+  // Determine model terms
+  let modelTerm = "female model";
+  if (gender === "men") {
+    modelTerm = "male model";
+  } else if (gender === "kids") {
+    modelTerm = "child model";
+  } else if (gender === "womens" || gender === "women") {
+    const task = res.data?.data;
+    if (!task || !task.result_url) {
+      throw new Error(`[${taskId}] Claid response missing result_url`);
+    }
+    return task;
+
+  } catch (err) {
+    if (err.response) {
+      console.error(`[${taskId}] Claid API Error (${err.response.status}):`, JSON.stringify(err.response.data, null, 2));
+    }
+
+    if (err.response && err.response.status === 429) {
+      console.warn(`[${taskId}] Rate limited (429). Retrying in 5s...`);
+      await sleep(5000 * (attempt + 1)); // Backoff: 5s, 10s, 15s
+      attempt++;
+    } else {
+      throw err; // Rethrow other errors
+    }
+  }
+}
+throw new Error(`[${taskId}] Failed after ${maxRetries} retries (Rate Limit)`);
 }
 
 /**
