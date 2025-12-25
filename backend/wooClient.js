@@ -169,11 +169,12 @@ async function resolveCategories(api, { gender, category, isHooded, name }) {
   if (!gender) return [];
 
   const cats = [];
+  const safeGender = String(gender).toLowerCase();
 
   // 1. Resolve Parent Category (Gender)
   let parentName = "Guys";
-  if (gender === 'women' || gender === 'womens') parentName = "Girls";
-  if (gender === 'kids') parentName = "Groms";
+  if (safeGender === 'women' || safeGender === 'womens' || safeGender === 'girl' || safeGender === 'girls') parentName = "Girls";
+  if (safeGender === 'kids' || safeGender === 'boy' || safeGender === 'boys' || safeGender === 'groms') parentName = "Groms";
 
   const parentCat = await getOrCreateCategory(api, parentName);
   if (parentCat) cats.push({ id: parentCat.id });
