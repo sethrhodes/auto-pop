@@ -88,10 +88,11 @@ function Wizard() {
           },
           gallery: loadedGallery,
           variants: loadedVariants,
-          gender: product.gender,
-          category: product.category,
-          isHooded: product.is_hooded
+          gender: product.gender || 'men',
+          category: product.category || 'top',
+          isHooded: product.is_hooded !== null ? product.is_hooded : (product.name.toLowerCase().includes('hood') ? true : false)
         });
+        setSelectedGender(product.gender || 'men');
         setStep(2);
       }
     } catch (err) {
