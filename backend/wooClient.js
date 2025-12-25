@@ -19,6 +19,10 @@ function getWooClient(apiKeys = {}) {
     if (baseURL.endsWith("/")) {
       baseURL = baseURL.slice(0, -1);
     }
+    // Append standard Woo V3 API path if not present
+    if (!baseURL.includes("/wp-json")) {
+      baseURL += "/wp-json/wc/v3";
+    }
   }
   const consumerKey = apiKeys.WC_CONSUMER_KEY || process.env.WC_CONSUMER_KEY;
   const consumerSecret = apiKeys.WC_CONSUMER_SECRET || process.env.WC_CONSUMER_SECRET;
