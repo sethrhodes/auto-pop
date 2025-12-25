@@ -165,6 +165,7 @@ async function updateProduct(id, data, apiKeys = {}) {
 // --- CATEGORY HELPERS ---
 
 async function resolveCategories(api, { gender, category, isHooded }) {
+  console.log(`[Woo] Resolving categories for: Gender=${gender}, Cat=${category}, Hooded=${isHooded}`);
   if (!gender) return [];
 
   const cats = [];
@@ -199,20 +200,28 @@ async function getOrCreateCategory(api, name, parentId = 0) {
     // Woo API doesn't strictly enforce unique names across parents, but slug must be unique.
 
     // Attempt lookup (this is simple lookup, robust implementation might be more complex)
-    const res = await api.get(`/products/categories?search=${encodeURIComponent(name)}`);
+    const searchUrl = `/products/categories?search=${encodeURIComponent(name)}`;
+    console.log(`[Woo] Searching category: ${searchUrl}`);
+    const res = await api.get(searchUrl);
+
+    // Strict matching
     let cat = res.data.find(c => c.name.toLowerCase() === name.toLowerCase() && c.parent === parentId);
 
-    if (!cat) {
-      console.log(`Creating category: ${name} (Parent: ${parentId})`);
+    if (cat) {
+      console.log(`[Woo] Found category '${name}' (ID: ${cat.id})`);
+    } else {
+      console.log(`[Woo] Creating category: ${name} (Parent: ${parentId})`);
       const createRes = await api.post("/products/categories", {
         name: name,
         parent: parentId
       });
       cat = createRes.data;
+      console.log(`[Woo] Created category '${name}' (ID: ${cat.id})`);
     }
     return cat;
   } catch (e) {
-    console.error(`Failed to resolve category ${name}:`, e.message);
+    console.error(`[Woo] Failed to resolve category ${name}:`, e.message);
+    if (e.response) console.error(JSON.stringify(e.response.data));
     return null;
   }
 }
