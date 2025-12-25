@@ -31,22 +31,23 @@ async function preprocessImage(filePath) {
 
     const { width, height } = await image.metadata();
 
-    // 2. Create Pixelated Base (1/8th scale)
+    // 2. Create Pixelated Base (1/4th scale - finer grain)
     const pixelated = await image.clone()
-      .resize(Math.ceil(width / 8), null, { kernel: 'nearest' })
+      .resize(Math.ceil(width / 4), null, { kernel: 'nearest' })
       .resize(width, height, { kernel: 'nearest' })
       .toBuffer();
 
-    // 3. Crop Center (Sharp) - Increased to 75% coverage
-    const cropW = Math.floor(width * 0.75);
-    const cropH = Math.floor(height * 0.75);
+    // 3. Crop Center (Sharp) - Increased to 85% coverage
+    const cropW = Math.floor(width * 0.85);
+    const cropH = Math.floor(height * 0.85);
     const left = Math.floor((width - cropW) / 2);
     const top = Math.floor((height - cropH) / 2);
 
-    // Apply sharpening to the center to help OCR/AI persistence
+    // Apply Contrast + Sharpen to help API resolving power
     const sharpCenter = await image.clone()
       .extract({ left, top, width: cropW, height: cropH })
-      .sharpen({ sigma: 1.5, m1: 0.5, y2: 10, x1: 2 }) // Strong sharpen
+      .modulate({ brightness: 1.05, saturation: 1.1 }) // Pop the colors/text
+      .sharpen({ sigma: 1.2, m1: 0.3, y2: 10, x1: 2 }) // Refined sharpen
       .toBuffer();
 
     // 4. Composite Sharp Center onto Pixelated Base
@@ -54,9 +55,10 @@ async function preprocessImage(filePath) {
 
     await sharp(pixelated)
       .composite([{ input: sharpCenter, top: top, left: left }])
+      .jpeg({ quality: 90, mozjpeg: true }) // optimized compression
       .toFile(outputPath);
 
-    console.log("Smart Pixelation complete:", outputPath);
+    console.log("Smart Pixelation V2 complete:", outputPath);
     return outputPath;
 
   } catch (err) {
