@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const FormData = require("form-data");
+const sharp = require("sharp");
 const { extractText } = require("./ocrClient");
 require("dotenv").config();
 
@@ -15,24 +16,70 @@ function sleep(ms) {
 }
 
 /**
+ * Smart Pre-processing:
+ * Pixelate edges (low file size) but keep center SHARP (for text clarity).
+ */
+async function preprocessImage(filePath) {
+  try {
+    const image = sharp(filePath);
+    const metadata = await image.metadata();
+
+    // 1. Resize if super massive (>3000px) to safe limit
+    if (metadata.width > 3000 || metadata.height > 3000) {
+      await image.resize({ width: 3000, height: 3000, fit: 'inside' });
+    }
+
+    const { width, height } = await image.metadata();
+
+    // 2. Create Pixelated Base (1/8th scale)
+    const pixelated = await image.clone()
+      .resize(Math.ceil(width / 8), null, { kernel: 'nearest' })
+      .resize(width, height, { kernel: 'nearest' })
+      .toBuffer();
+
+    // 3. Crop Center (Sharp) - 60% of width/height
+    const cropW = Math.floor(width * 0.6);
+    const cropH = Math.floor(height * 0.6);
+    const left = Math.floor((width - cropW) / 2);
+    const top = Math.floor((height - cropH) / 2);
+
+    const sharpCenter = await image.clone()
+      .extract({ left, top, width: cropW, height: cropH })
+      .toBuffer();
+
+    // 4. Composite Sharp Center onto Pixelated Base
+    const outputPath = path.join(path.dirname(filePath), `processed_${path.basename(filePath)}`);
+
+    await sharp(pixelated)
+      .composite([{ input: sharpCenter, top: top, left: left }])
+      .toFile(outputPath);
+
+    console.log("Smart Pixelation complete:", outputPath);
+    return outputPath;
+
+  } catch (err) {
+    console.error("Smart Pixelation failed, using original:", err.message);
+    return filePath;
+  }
+}
+
+/**
  * Upload a local file to Claid to get a temporary public URL.
  * We use a minimal "resize" op or similar to trigger the upload flow.
  */
 async function uploadToClaid(filePath, apiKey) {
+  // Pre-process local file (Pixelate edges, keep center sharp)
+  const processedPath = await preprocessImage(filePath);
+
   const form = new FormData();
-  form.append("file", fs.createReadStream(filePath));
+  form.append("file", fs.createReadStream(processedPath));
   // Minimal config to just get the file uploaded and returned
   form.append(
     "data",
     JSON.stringify({
       operations: {
-        // No-op or minimal op: re-encode to jpeg partial quality? 
-        // Or just resize to same width? Let's just do a dummy logic via 'smart_height' or similar defaults.
-        // Actually, Claid requires at least one op usually.
-        // Let's rely on simple 'restoration' or just 'resize'.
-        // "Ghost" improvements: Remove background + Center/Pad
-        // "Ghost" improvements: Remove background + Standardize size
-        resizing: { width: 1500, height: 2000, fit: "bounds" },
+        // Relaxed limits to allow high-res center
+        resizing: { width: 3000, height: 3000, fit: "inside" },
         background: { remove: true },
       },
     })
