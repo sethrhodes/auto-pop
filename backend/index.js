@@ -367,6 +367,7 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
     let localProduct;
 
     // Check if we should UPDATE or CREATE
+    console.log("Publish local lookup ID:", product.id);
     if (product.id) {
       localProduct = await Product.findOne({ where: { id: product.id, user_id: req.user.id } });
     }
