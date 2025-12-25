@@ -24,45 +24,27 @@ async function preprocessImage(filePath) {
     const image = sharp(filePath);
     const metadata = await image.metadata();
 
-    // 1. Resize if super massive (>4000px) to safe limit (increased for clarity)
-    if (metadata.width > 4000 || metadata.height > 4000) {
-      await image.resize({ width: 4000, height: 4000, fit: 'inside' });
+    // 1. Resize to optimal AI resolution (2500px)
+    // 4000px is too large and gets downscaled poorly by models. 2500px is the sweet spot.
+    if (metadata.width > 2500 || metadata.height > 2500) {
+      await image.resize({ width: 2500, height: 2500, fit: 'inside' });
     }
 
-    const { width, height } = await image.metadata();
-
-    // 2. Create Pixelated Base (1/4th scale - finer grain)
-    const pixelated = await image.clone()
-      .resize(Math.ceil(width / 4), null, { kernel: 'nearest' })
-      .resize(width, height, { kernel: 'nearest' })
-      .toBuffer();
-
-    // 3. Crop Center (Sharp) - Increased to 85% coverage
-    const cropW = Math.floor(width * 0.85);
-    const cropH = Math.floor(height * 0.85);
-    const left = Math.floor((width - cropW) / 2);
-    const top = Math.floor((height - cropH) / 2);
-
-    // Apply Contrast + Sharpen to help API resolving power
-    const sharpCenter = await image.clone()
-      .extract({ left, top, width: cropW, height: cropH })
-      .modulate({ brightness: 1.05, saturation: 1.1 }) // Pop the colors/text
-      .sharpen({ sigma: 1.2, m1: 0.3, y2: 10, x1: 2 }) // Refined sharpen
-      .toBuffer();
-
-    // 4. Composite Sharp Center onto Pixelated Base
+    // 2. Global Enhancement (Contrast + Sharpen)
+    // No pixelation tricks. Just clean, high-contrast, sharp input.
     const outputPath = path.join(path.dirname(filePath), `processed_${path.basename(filePath)}`);
 
-    await sharp(pixelated)
-      .composite([{ input: sharpCenter, top: top, left: left }])
-      .jpeg({ quality: 90, mozjpeg: true }) // optimized compression
+    await image
+      .modulate({ brightness: 1.05, saturation: 1.1 }) // Slight boost to separate text from background
+      .sharpen({ sigma: 1.0, m1: 0.5, y2: 10, x1: 2 }) // Gentle global sharpen to define edges
+      .jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' }) // Max quality, no color subsampling (crucial for red/blue text)
       .toFile(outputPath);
 
-    console.log("Smart Pixelation V2 complete:", outputPath);
+    console.log("Global Enhance V3 complete:", outputPath);
     return outputPath;
 
   } catch (err) {
-    console.error("Smart Pixelation failed, using original:", err.message);
+    console.error("Enhancement failed, using original:", err.message);
     return filePath;
   }
 }
@@ -83,7 +65,7 @@ async function uploadToClaid(filePath, apiKey) {
     JSON.stringify({
       operations: {
         // Relaxed limits to allow high-res center
-        resizing: { width: 4000, height: 4000, fit: "bounds" },
+        resizing: { width: 2500, height: 2500, fit: "bounds" },
         background: { remove: true },
       },
     })
