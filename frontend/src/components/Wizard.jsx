@@ -87,7 +87,10 @@ function Wizard() {
             back: product.back_image
           },
           gallery: loadedGallery,
-          variants: loadedVariants // NEW
+          variants: loadedVariants,
+          gender: product.gender,
+          category: product.category,
+          isHooded: product.is_hooded
         });
         setStep(2);
       }
