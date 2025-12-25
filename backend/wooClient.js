@@ -74,8 +74,10 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
     manage_stock: true,
     stock_quantity: quantity,
     images: images,
-    categories: await resolveCategories(api, { gender, category, isHooded })
+    categories: await resolveCategories(api, { gender, category, isHooded, name })
   };
+
+  console.log("[Woo] Create Payload Categories:", JSON.stringify(payload.categories));
 
   try {
     const response = await api.post("/products", payload);
@@ -156,6 +158,8 @@ async function updateProduct(id, data, apiKeys = {}) {
     status: "publish",
     categories: await resolveCategories(api, data)
   };
+
+  console.log("[Woo] Update Payload Categories:", JSON.stringify(payload.categories));
 
   const response = await api.put(`/products/${id}`, payload);
   console.log("Product Updated ID:", response.data.id);
