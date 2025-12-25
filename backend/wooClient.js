@@ -66,7 +66,7 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
 
   // Default to S-XXL if no variants provided
   if (!variants || variants.length === 0) {
-    const sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+    const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
     variants = sizes.map(size => ({
       size: size,
       qty: 1,
@@ -178,7 +178,7 @@ async function updateProduct(id, data, apiKeys = {}) {
 
   // Default to S-XXL if no variants provided (Force Variable)
   if (!variants || variants.length === 0) {
-    const sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+    const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
     variants = sizes.map(size => ({
       size: size,
       qty: 1,
