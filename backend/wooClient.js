@@ -72,7 +72,7 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
     sku: sku || "",
     description: description || "",
     short_description: short_description || "",
-    status: "publish",
+    status: "private",
     manage_stock: !isVariable, // Variable parent doesn't manage stock directly
     stock_quantity: isVariable ? undefined : quantity,
     images: images,
@@ -169,7 +169,8 @@ async function updateProduct(id, data, apiKeys = {}) {
     short_description: data.short_description,
     images: data.images,
     stock_quantity: data.quantity,
-    status: "publish",
+    stock_quantity: data.quantity,
+    status: "private",
     categories: await resolveCategories(api, data)
   };
 
