@@ -173,20 +173,47 @@ async function updateProductStockBySku(sku, quantity, apiKeys = {}) {
  */
 async function updateProduct(id, data, apiKeys = {}) {
   const api = getWooClient(apiKeys);
+  let variants = data.variants || [];
+  const sku = data.sku || "";
+
+  // Default to S-XXL if no variants provided (Force Variable)
+  if (!variants || variants.length === 0) {
+    const sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+    variants = sizes.map(size => ({
+      size: size,
+      qty: 1,
+      sku: `${sku}${size}`
+    }));
+  }
+  const isVariable = Array.isArray(variants) && variants.length > 0;
   const payload = {
     name: data.name,
+    type: isVariable ? "variable" : "simple", // Force type conversion
     regular_price: String(data.price),
     description: data.description,
     short_description: data.short_description,
     images: data.images,
-    stock_quantity: data.quantity,
-    stock_quantity: data.quantity,
+    manage_stock: !isVariable,
+    stock_quantity: isVariable ? undefined : data.quantity,
     status: "private",
-    categories: await resolveCategories(api, data)
+    categories: await resolveCategories(api, data),
+    attributes: isVariable ? [{
+      id: 0,
+      name: "Size",
+      position: 0,
+      visible: true,
+      variation: true,
+      options: [...new Set(variants.map(v => v.size))]
+    }] : []
   };
 
   const response = await api.put(`/products/${id}`, payload);
   console.log("Product Updated ID:", response.data.id);
+
+  if (isVariable) {
+    await createVariations(api, id, variants, data.price);
+  }
+
   return response.data;
 }
 
