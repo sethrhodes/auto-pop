@@ -261,6 +261,7 @@ function Wizard() {
       const payload = {
         product: {
           ...finalData,
+          id: draftData?.id || searchParams.get('productId'), // Pass ID to update existing draft instead of creating new
           quantity: quantity,
           gender: draftData?.gender,
           category: draftData?.category,
