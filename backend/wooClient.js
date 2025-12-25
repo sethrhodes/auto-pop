@@ -58,7 +58,7 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
     sku: sku || "",
     description: description || "",
     short_description: short_description || "",
-    status: "draft",
+    status: "publish",
     manage_stock: true,
     stock_quantity: quantity,
     images: images,
@@ -148,7 +148,8 @@ async function updateProduct(id, data, apiKeys = {}) {
     description: data.description,
     short_description: data.short_description,
     images: data.images,
-    stock_quantity: data.quantity
+    stock_quantity: data.quantity,
+    status: "publish"
   };
 
   const response = await api.put(`/products/${id}`, payload);
