@@ -230,8 +230,13 @@ async function getOrCreateCategory(api, name, parentId = 0) {
     }
     return cat;
   } catch (e) {
-    console.error(`[Woo] Failed to resolve category ${name}:`, e.stack);
-    if (e.response) console.error(JSON.stringify(e.response.data));
+    const msg = e.response ? JSON.stringify(e.response.data) : e.message;
+    console.error(`[Woo] Failed to resolve category ${name}:`, msg);
+
+    if (e.code === 'EAI_AGAIN' || e.code === 'ECONNREFUSED') {
+      console.error(`[Woo] CONNECTION ERROR: Cannot reach WooCommerce at ${api.defaults.baseURL}`);
+      console.error(`[Woo] HINT: Check WC_BASE_URL in your .env file. using 'auto-pop-dev.local' or 'localhost' may not work on a remote server.`);
+    }
     return null;
   }
 }
