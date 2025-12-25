@@ -49,7 +49,7 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
 
     const handlePublish = () => {
         if (!window.confirm("Are you sure you want to publish this product? This will push it to the live store.")) return;
-        onPublish({ ...formData, gallery: aiGallery });
+        onPublish({ ...formData, gallery: aiGallery, variants: draftData?.variants });
     };
 
     const handleSave = () => {

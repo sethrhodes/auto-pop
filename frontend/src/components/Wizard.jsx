@@ -261,6 +261,7 @@ function Wizard() {
       const payload = {
         product: {
           ...finalData,
+          variants: finalData.variants, // Ensure variants are passed explicitly if needed, though ...finalData covers it.
           id: draftData?.id || searchParams.get('productId'), // Pass ID to update existing draft instead of creating new
           quantity: quantity,
           gender: draftData?.gender || selectedGender || 'men',

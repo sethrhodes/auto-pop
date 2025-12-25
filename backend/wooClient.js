@@ -61,27 +61,41 @@ async function createTestProduct(apiKeys) {
 /**
  * Create a full product with images.
  */
-async function createProduct({ name, price, sku, quantity = 1, description, short_description, images = [], gender, category, isHooded, apiKeys = {} }) {
+async function createProduct({ name, price, sku, quantity = 1, description, short_description, images = [], gender, category, isHooded, variants = [], apiKeys = {} }) {
   const api = getWooClient(apiKeys);
+  const isVariable = Array.isArray(variants) && variants.length > 0;
+
   const payload = {
     name,
-    type: "simple",
+    type: isVariable ? "variable" : "simple",
     regular_price: String(price),
     sku: sku || "",
     description: description || "",
     short_description: short_description || "",
     status: "publish",
-    manage_stock: true,
-    stock_quantity: quantity,
+    manage_stock: !isVariable, // Variable parent doesn't manage stock directly
+    stock_quantity: isVariable ? undefined : quantity,
     images: images,
-    categories: await resolveCategories(api, { gender, category, isHooded, name })
+    categories: await resolveCategories(api, { gender, category, isHooded, name }),
+    attributes: isVariable ? [{
+      id: 0, // 0 for custom attribute
+      name: "Size", // Attribute name
+      position: 0,
+      visible: true,
+      variation: true,
+      options: [...new Set(variants.map(v => v.size))] // Unique sizes
+    }] : []
   };
-
-  console.log("[Woo] Create Payload Categories:", JSON.stringify(payload.categories));
 
   try {
     const response = await api.post("/products", payload);
-    console.log("Product Created ID:", response.data.id);
+    const productId = response.data.id;
+    console.log("Product Created ID:", productId);
+
+    if (isVariable) {
+      await createVariations(api, productId, variants, price);
+    }
+
     return response.data;
   } catch (err) {
     if (err.response && (err.response.data.code === 'woocommerce_rest_product_not_created' || err.response.data.code === 'product_invalid_sku')) {
@@ -158,8 +172,6 @@ async function updateProduct(id, data, apiKeys = {}) {
     status: "publish",
     categories: await resolveCategories(api, data)
   };
-
-  console.log("[Woo] Update Payload Categories:", JSON.stringify(payload.categories));
 
   const response = await api.put(`/products/${id}`, payload);
   console.log("Product Updated ID:", response.data.id);
@@ -243,6 +255,31 @@ async function getOrCreateCategory(api, name, parentId = 0) {
     }
     return null;
   }
+}
+
+async function createVariations(api, productId, variants, price) {
+  console.log(`[Woo] Creating ${variants.length} variations for Product ${productId}...`);
+
+  // Create variations in parallel
+  const promises = variants.map(v => {
+    const variationPayload = {
+      regular_price: String(price),
+      sku: v.sku,
+      manage_stock: true,
+      stock_quantity: parseInt(v.qty) || 0,
+      attributes: [{
+        id: 0,
+        name: "Size",
+        option: v.size
+      }]
+    };
+    return api.post(`/products/${productId}/variations`, variationPayload)
+      .then(res => console.log(`   -> Created variation: ${v.size} (ID: ${res.data.id})`))
+      .catch(e => console.error(`   -> Failed to create variation ${v.size}: ${e.message}`));
+  });
+
+  await Promise.all(promises);
+  console.log("[Woo] All variations processed.");
 }
 
 module.exports = {
