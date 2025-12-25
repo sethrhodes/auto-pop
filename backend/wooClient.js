@@ -229,7 +229,7 @@ async function getOrCreateCategory(api, name, parentId = 0) {
     }
     return cat;
   } catch (e) {
-    console.error(`[Woo] Failed to resolve category ${name}:`, e.message);
+    console.error(`[Woo] Failed to resolve category ${name}:`, e.stack);
     if (e.response) console.error(JSON.stringify(e.response.data));
     return null;
   }
@@ -239,5 +239,7 @@ module.exports = {
   createTestProduct,
   createProduct,
   updateProductStockBySku,
-  updateProduct
+  updateProduct,
+  resolveCategories,
+  getOrCreateCategory
 };
