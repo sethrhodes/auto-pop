@@ -61,7 +61,7 @@ async function createTestProduct(apiKeys) {
 /**
  * Create a full product with images.
  */
-async function createProduct({ name, price, sku, quantity = 1, description, short_description, images = [], apiKeys = {} }) {
+async function createProduct({ name, price, sku, quantity = 1, description, short_description, images = [], gender, category, isHooded, apiKeys = {} }) {
   const api = getWooClient(apiKeys);
   const payload = {
     name,
@@ -74,6 +74,7 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
     manage_stock: true,
     stock_quantity: quantity,
     images: images,
+    categories: await resolveCategories(api, { gender, category, isHooded })
   };
 
   try {
@@ -81,19 +82,11 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
     console.log("Product Created ID:", response.data.id);
     return response.data;
   } catch (err) {
-    // Handle SKU Conflict (Upsert)
-    // Code 'woocommerce_rest_product_not_created' often means SKU exists. 'product_invalid_sku' is another.
     if (err.response && (err.response.data.code === 'woocommerce_rest_product_not_created' || err.response.data.code === 'product_invalid_sku')) {
       console.log(`SKU conflict for ${sku}. Attempting update existing product...`);
-
-      // 1. Find the existing product via SKU (including Trash)
-      // Note: WooCommerce API might require 'status' param to find trash
-      let search = await api.get(`/products?sku=${encodeURIComponent(sku)}`); // Try default first (publish/draft)
-
+      let search = await api.get(`/products?sku=${encodeURIComponent(sku)}`);
       if (!search.data || search.data.length === 0) {
-        // Try searching specifically for trash
         try {
-          // Some Woo versions need 'trash' explicitly
           const trashSearch = await api.get(`/products?sku=${encodeURIComponent(sku)}&status=trash`);
           if (trashSearch.data && trashSearch.data.length > 0) search = trashSearch;
         } catch (e) { console.log("Trash search failed", e.message); }
@@ -102,18 +95,14 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
       if (search.data && search.data.length > 0) {
         const existingId = search.data[0].id;
         console.log(`Found existing product ID: ${existingId}. Updating...`);
-
-        // 2. data-driven Update
-        const updateRes = await api.put(`/products/${existingId}`, payload);
-        return updateRes.data;
+        const updateRes = await updateProduct(existingId, { ...data, categories: payload.categories }, apiKeys); // Recursive call to update with categories
+        return updateRes;
       } else {
-        // SKU exists but not found via search?
         console.warn("SKU exists in lookup table but product not found via API.");
         throw new Error(`SKU ${sku} is taken by a deleted product. Go to WooCommerce > Products > Trash and 'Delete Permanently', then try again.`);
       }
     }
-
-    throw err; // Re-throw other errors
+    throw err;
   }
 }
 
@@ -161,12 +150,68 @@ async function updateProduct(id, data, apiKeys = {}) {
     short_description: data.short_description,
     images: data.images,
     stock_quantity: data.quantity,
-    status: "publish"
+    status: "publish",
+    categories: await resolveCategories(api, data)
   };
 
   const response = await api.put(`/products/${id}`, payload);
   console.log("Product Updated ID:", response.data.id);
   return response.data;
+}
+
+// --- CATEGORY HELPERS ---
+
+async function resolveCategories(api, { gender, category, isHooded }) {
+  if (!gender) return [];
+
+  const cats = [];
+
+  // 1. Resolve Parent Category (Gender)
+  let parentName = "Guys";
+  if (gender === 'women' || gender === 'womens') parentName = "Girls";
+  if (gender === 'kids') parentName = "Groms";
+
+  const parentCat = await getOrCreateCategory(api, parentName);
+  if (parentCat) cats.push({ id: parentCat.id });
+
+  // 2. Resolve Sub Category (Type)
+  // Logic: Top + Hooded = Hoodies, Top + !Hooded = Tees
+  // Note: Only if 'top'. Currently ignored for 'bottom' as user only specified Hats/Hoodies/Tees.
+  if (category === 'top') {
+    let subName = isHooded ? "Hoodies" : "Tees";
+    if (parentCat) {
+      const subCat = await getOrCreateCategory(api, subName, parentCat.id);
+      if (subCat) cats.push({ id: subCat.id });
+    }
+  }
+
+  return cats;
+}
+
+async function getOrCreateCategory(api, name, parentId = 0) {
+  try {
+    // Search for category
+    // Note: Filtering by parent is tricky in standard API search, so we search by name and filter manually if needed, 
+    // or trust unique names. "Hoodies" might exist under both Guys and Girls?
+    // Woo API doesn't strictly enforce unique names across parents, but slug must be unique.
+
+    // Attempt lookup (this is simple lookup, robust implementation might be more complex)
+    const res = await api.get(`/products/categories?search=${encodeURIComponent(name)}`);
+    let cat = res.data.find(c => c.name.toLowerCase() === name.toLowerCase() && c.parent === parentId);
+
+    if (!cat) {
+      console.log(`Creating category: ${name} (Parent: ${parentId})`);
+      const createRes = await api.post("/products/categories", {
+        name: name,
+        parent: parentId
+      });
+      cat = createRes.data;
+    }
+    return cat;
+  } catch (e) {
+    console.error(`Failed to resolve category ${name}:`, e.message);
+    return null;
+  }
 }
 
 module.exports = {

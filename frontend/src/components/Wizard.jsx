@@ -113,7 +113,10 @@ function Wizard() {
           id: productId, // Pass ID to trigger update
           quantity: quantity,
           front_image: draftData?.images?.front,
-          back_image: draftData?.images?.back
+          back_image: draftData?.images?.back,
+          gender: draftData?.gender,
+          category: draftData?.category,
+          isHooded: draftData?.isHooded
         }
       };
 
@@ -227,6 +230,8 @@ function Wizard() {
       setDraftData(prev => ({
         ...prev,
         isHooded: isHooded, // Store for regeneration
+        gender: gender,
+        category: category,
         gallery: genData.gallery // Attach generated gallery to draft data
       }));
 
@@ -252,7 +257,10 @@ function Wizard() {
       const payload = {
         product: {
           ...finalData,
-          quantity: quantity
+          quantity: quantity,
+          gender: draftData?.gender,
+          category: draftData?.category,
+          isHooded: draftData?.isHooded
         }
       };
 

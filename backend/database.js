@@ -73,67 +73,69 @@ const Product = sequelize.define('Product', {
     remote_id: { type: DataTypes.STRING, allowNull: true }, // WooCommerce ID
     variants: { type: DataTypes.TEXT, allowNull: true }, // JSON: [{ sku, size, color, qty, price }]
     front_image: { type: DataTypes.STRING, allowNull: true }, // Original Filename
-    back_image: { type: DataTypes.STRING, allowNull: true } // Original Filename
-});
+    back_image: { type: DataTypes.STRING, allowNull: true }, // Original Filename
+    gender: { type: DataTypes.STRING, allowNull: true }, // 'men', 'women', 'kids'
+    category: { type: DataTypes.STRING, allowNull: true }, // 'top', 'bottom'
+    is_hooded: { type: DataTypes.BOOLEAN, allowNull: true } // true/false
 
 
 // Relationships
 User.hasMany(UserSettings, { foreignKey: 'user_id' });
-UserSettings.belongsTo(User, { foreignKey: 'user_id' });
+    UserSettings.belongsTo(User, { foreignKey: 'user_id' });
 
-User.hasMany(Product, { foreignKey: 'user_id' });
-Product.belongsTo(User, { foreignKey: 'user_id' });
+    User.hasMany(Product, { foreignKey: 'user_id' });
+    Product.belongsTo(User, { foreignKey: 'user_id' });
 
 
-// --- ENCRYPTION HELPERS ---
-// We need a stable secret for encryption. 
-// Fallback to a hardcoded string if env var missing (DEV ONLY), generally bad practice but ok for MVP local tool.
-const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'dev_secret_key_32_bytes_long_string!!';
-// Ensure key is 32 bytes
-const ALGORITHM = 'aes-256-cbc';
+    // --- ENCRYPTION HELPERS ---
+    // We need a stable secret for encryption. 
+    // Fallback to a hardcoded string if env var missing (DEV ONLY), generally bad practice but ok for MVP local tool.
+    const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'dev_secret_key_32_bytes_long_string!!';
+    // Ensure key is 32 bytes
+    const ALGORITHM = 'aes-256-cbc';
 
-function getCryptoKey() {
+    function getCryptoKey() {
     return crypto.scryptSync(ENCRYPTION_SECRET, 'salt', 32);
 }
 
 function encrypt(text) {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(ALGORITHM, getCryptoKey(), iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return {
-        iv: iv.toString('hex'),
-        content: encrypted.toString('hex')
-    };
-}
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv(ALGORITHM, getCryptoKey(), iv);
+        let encrypted = cipher.update(text);
+        encrypted = Buffer.concat([encrypted, cipher.final()]);
+        return {
+            iv: iv.toString('hex'),
+            content: encrypted.toString('hex')
+        };
+    }
 
 function decrypt(hash) {
-    const iv = Buffer.from(hash.iv, 'hex');
-    const encryptedText = Buffer.from(hash.content, 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, getCryptoKey(), iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-}
+        const iv = Buffer.from(hash.iv, 'hex');
+        const encryptedText = Buffer.from(hash.content, 'hex');
+        const decipher = crypto.createDecipheriv(ALGORITHM, getCryptoKey(), iv);
+        let decrypted = decipher.update(encryptedText);
+        decrypted = Buffer.concat([decrypted, decipher.final()]);
+        return decrypted.toString();
+    }
 
 
 // --- INIT FUNCTION ---
 async function initDB() {
-    try {
-        await sequelize.authenticate();
-        await sequelize.sync({ alter: true }); // Create or Update tables
-        console.log('Database connected and synced.');
-    } catch (error) {
-        console.error('Unable to connect to the database:', error);
+        try {
+            await sequelize.authenticate();
+            await sequelize.sync({ alter: true }); // Create or Update tables
+            console.log('Database connected and synced.');
+        } catch (error) {
+            console.error('Unable to connect to the database:', error);
+        }
     }
-}
 
 module.exports = {
-    sequelize,
-    User,
-    UserSettings,
-    Product, // Added
-    initDB,
-    encrypt,
-    decrypt
-};
+        sequelize,
+        User,
+        UserSettings,
+        Product, // Added
+        initDB,
+        encrypt,
+        decrypt
+    };
