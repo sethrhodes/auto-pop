@@ -95,7 +95,10 @@ async function createProduct({ name, price, sku, quantity = 1, description, shor
       if (search.data && search.data.length > 0) {
         const existingId = search.data[0].id;
         console.log(`Found existing product ID: ${existingId}. Updating...`);
-        const updateRes = await updateProduct(existingId, { ...data, categories: payload.categories }, apiKeys); // Recursive call to update with categories
+        const updateRes = await updateProduct(existingId, {
+          name, price, sku, quantity, description, short_description, images, gender, category, isHooded,
+          categories: payload.categories
+        }, apiKeys); // Recursive call to update with categories
         return updateRes;
       } else {
         console.warn("SKU exists in lookup table but product not found via API.");
