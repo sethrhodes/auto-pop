@@ -357,6 +357,7 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
     }
 
     console.log("Publishing product:", product.name);
+    console.log(`[API] Received Categorization: Gender=${product.gender}, Category=${product.category}, isHooded=${product.isHooded}`);
 
     // Format images for WooCommerce: [{ src: 'url' }, ...]
     const wooImages = (product.gallery || []).map(img => ({
