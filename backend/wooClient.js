@@ -11,7 +11,15 @@ const agent = new https.Agent({
  * Get configured Woo API client
  */
 function getWooClient(apiKeys = {}) {
-  const baseURL = apiKeys.WC_BASE_URL || process.env.WC_BASE_URL;
+  let baseURL = apiKeys.WC_BASE_URL || process.env.WC_BASE_URL;
+  if (baseURL) {
+    if (!baseURL.startsWith("http")) {
+      baseURL = `https://${baseURL}`;
+    }
+    if (baseURL.endsWith("/")) {
+      baseURL = baseURL.slice(0, -1);
+    }
+  }
   const consumerKey = apiKeys.WC_CONSUMER_KEY || process.env.WC_CONSUMER_KEY;
   const consumerSecret = apiKeys.WC_CONSUMER_SECRET || process.env.WC_CONSUMER_SECRET;
 
