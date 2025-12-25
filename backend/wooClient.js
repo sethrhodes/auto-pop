@@ -164,7 +164,7 @@ async function updateProduct(id, data, apiKeys = {}) {
 
 // --- CATEGORY HELPERS ---
 
-async function resolveCategories(api, { gender, category, isHooded }) {
+async function resolveCategories(api, { gender, category, isHooded, name }) {
   console.log(`[Woo] Resolving categories for: Gender=${gender}, Cat=${category}, Hooded=${isHooded}`);
   if (!gender) return [];
 
@@ -179,14 +179,23 @@ async function resolveCategories(api, { gender, category, isHooded }) {
   if (parentCat) cats.push({ id: parentCat.id });
 
   // 2. Resolve Sub Category (Type)
-  // Logic: Top + Hooded = Hoodies, Top + !Hooded = Tees
-  // Note: Only if 'top'. Currently ignored for 'bottom' as user only specified Hats/Hoodies/Tees.
-  if (category === 'top') {
-    let subName = isHooded ? "Hoodies" : "Tees";
-    if (parentCat) {
-      const subCat = await getOrCreateCategory(api, subName, parentCat.id);
-      if (subCat) cats.push({ id: subCat.id });
-    }
+  // Heuristic: Check name for "Hat" if not explicitly defined? 
+  // Or just rely on category input.
+
+  let subName = null;
+  const lowerName = (name || "").toLowerCase();
+
+  if (category === 'hat' || lowerName.includes('hat') || lowerName.includes('cap') || lowerName.includes('beanie')) {
+    subName = "Hats";
+  } else if (category === 'top') {
+    subName = isHooded ? "Hoodies" : "Tees";
+  } else if (category === 'bottom') {
+    // Future: Pants, Shorts...
+  }
+
+  if (subName && parentCat) {
+    const subCat = await getOrCreateCategory(api, subName, parentCat.id);
+    if (subCat) cats.push({ id: subCat.id });
   }
 
   return cats;
