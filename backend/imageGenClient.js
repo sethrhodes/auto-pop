@@ -24,9 +24,9 @@ async function preprocessImage(filePath) {
     const image = sharp(filePath);
     const metadata = await image.metadata();
 
-    // 1. Resize if super massive (>3000px) to safe limit
-    if (metadata.width > 3000 || metadata.height > 3000) {
-      await image.resize({ width: 3000, height: 3000, fit: 'inside' });
+    // 1. Resize if super massive (>4000px) to safe limit (increased for clarity)
+    if (metadata.width > 4000 || metadata.height > 4000) {
+      await image.resize({ width: 4000, height: 4000, fit: 'inside' });
     }
 
     const { width, height } = await image.metadata();
@@ -37,14 +37,16 @@ async function preprocessImage(filePath) {
       .resize(width, height, { kernel: 'nearest' })
       .toBuffer();
 
-    // 3. Crop Center (Sharp) - 60% of width/height
-    const cropW = Math.floor(width * 0.6);
-    const cropH = Math.floor(height * 0.6);
+    // 3. Crop Center (Sharp) - Increased to 75% coverage
+    const cropW = Math.floor(width * 0.75);
+    const cropH = Math.floor(height * 0.75);
     const left = Math.floor((width - cropW) / 2);
     const top = Math.floor((height - cropH) / 2);
 
+    // Apply sharpening to the center to help OCR/AI persistence
     const sharpCenter = await image.clone()
       .extract({ left, top, width: cropW, height: cropH })
+      .sharpen({ sigma: 1.5, m1: 0.5, y2: 10, x1: 2 }) // Strong sharpen
       .toBuffer();
 
     // 4. Composite Sharp Center onto Pixelated Base
@@ -79,7 +81,7 @@ async function uploadToClaid(filePath, apiKey) {
     JSON.stringify({
       operations: {
         // Relaxed limits to allow high-res center
-        resizing: { width: 3000, height: 3000, fit: "bounds" },
+        resizing: { width: 4000, height: 4000, fit: "bounds" },
         background: { remove: true },
       },
     })
