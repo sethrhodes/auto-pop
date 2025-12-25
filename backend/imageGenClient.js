@@ -79,7 +79,7 @@ async function uploadToClaid(filePath, apiKey) {
     JSON.stringify({
       operations: {
         // Relaxed limits to allow high-res center
-        resizing: { width: 3000, height: 3000, fit: "inside" },
+        resizing: { width: 3000, height: 3000, fit: "bounds" },
         background: { remove: true },
       },
     })
