@@ -385,66 +385,66 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
         gender: product.gender,
         category: product.category,
         isHooded: product.isHooded
+        isHooded: product.isHooded
       }, req.userKeys);
-    }, req.userKeys);
     } else {
-  // CREATE New Woo Product
-  wooProduct = await createProduct({
-    name: product.name,
-    price: product.price,
-    sku: product.sku,
-    quantity: product.quantity || 1,
-    description: product.description,
-    short_description: product.short_description,
-    images: wooImages,
-    gender: product.gender,
-    category: product.category,
-    isHooded: product.isHooded,
-    apiKeys: req.userKeys
-  });
-}
+      // CREATE New Woo Product
+      wooProduct = await createProduct({
+        name: product.name,
+        price: product.price,
+        sku: product.sku,
+        quantity: product.quantity || 1,
+        description: product.description,
+        short_description: product.short_description,
+        images: wooImages,
+        gender: product.gender,
+        category: product.category,
+        isHooded: product.isHooded,
+        apiKeys: req.userKeys
+      });
+    }
 
-// Save/Update to Local DB History
-const mainImage = wooImages.length > 0 ? wooImages[0].src : null;
+    // Save/Update to Local DB History
+    const mainImage = wooImages.length > 0 ? wooImages[0].src : null;
 
-if (localProduct) {
-  await localProduct.update({
-    name: product.name,
-    sku: product.sku,
-    price: product.price,
-    status: 'published',
-    image_url: mainImage,
-    remote_id: wooProduct.id.toString(),
-    gender: product.gender,
-    category: product.category,
-    is_hooded: product.isHooded
-  });
-} else {
-  await Product.create({
-    user_id: req.user.id,
-    name: product.name,
-    sku: product.sku,
-    price: product.price,
-    status: 'published',
-    image_url: mainImage,
-    remote_id: wooProduct.id.toString(),
-    gender: product.gender,
-    category: product.category,
-    is_hooded: product.isHooded
-  });
-}
+    if (localProduct) {
+      await localProduct.update({
+        name: product.name,
+        sku: product.sku,
+        price: product.price,
+        status: 'published',
+        image_url: mainImage,
+        remote_id: wooProduct.id.toString(),
+        gender: product.gender,
+        category: product.category,
+        is_hooded: product.isHooded
+      });
+    } else {
+      await Product.create({
+        user_id: req.user.id,
+        name: product.name,
+        sku: product.sku,
+        price: product.price,
+        status: 'published',
+        image_url: mainImage,
+        remote_id: wooProduct.id.toString(),
+        gender: product.gender,
+        category: product.category,
+        is_hooded: product.isHooded
+      });
+    }
 
-res.json({ success: true, product: wooProduct });
+    res.json({ success: true, product: wooProduct });
 
   } catch (err) {
-  if (err.response) {
-    console.error("WooCommerce Error:", JSON.stringify(err.response.data, null, 2));
-    // Send the Woo error details to the frontend
-    return res.status(500).json({ error: "Publish failed", details: JSON.stringify(err.response.data) });
+    if (err.response) {
+      console.error("WooCommerce Error:", JSON.stringify(err.response.data, null, 2));
+      // Send the Woo error details to the frontend
+      return res.status(500).json({ error: "Publish failed", details: JSON.stringify(err.response.data) });
+    }
+    console.error("Error in /api/publish:", err.message);
+    res.status(500).json({ error: "Publish failed", details: err.message });
   }
-  console.error("Error in /api/publish:", err.message);
-  res.status(500).json({ error: "Publish failed", details: err.message });
-}
 });
 
 // SPA Catch-all (for React Router)
