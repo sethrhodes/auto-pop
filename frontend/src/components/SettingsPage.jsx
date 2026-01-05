@@ -5,9 +5,6 @@ import { useAuth } from "../context/AuthContext";
 export default function SettingsPage() {
     const { token, user } = useAuth();
     const [keys, setKeys] = useState({
-        IMAGE_API_KEY: "",
-        OPENAI_API_KEY: "",
-        OCR_API_KEY: "", // Added
         WC_BASE_URL: "",
         WC_CONSUMER_KEY: "",
         WC_CONSUMER_SECRET: "",
@@ -83,7 +80,7 @@ export default function SettingsPage() {
     );
 
     // Check critical keys
-    const missingCriticalKeys = !savedKeys.IMAGE_API_KEY || !savedKeys.OPENAI_API_KEY || !savedKeys.WC_BASE_URL;
+    const missingCriticalKeys = !savedKeys.WC_BASE_URL;
 
     return (
         <div className="p-4 sm:p-8 max-w-4xl mx-auto">
@@ -136,55 +133,6 @@ export default function SettingsPage() {
                 </h2>
 
                 <div className="space-y-8">
-
-                    {/* AI Services */}
-                    <div>
-                        <h3 className="font-semibold text-lg text-gray-800 border-b pb-2 mb-4">AI Services</h3>
-                        <div className="grid grid-cols-1 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Claid API Key (Image Gen)
-                                    {savedKeys.IMAGE_API_KEY && <SavedBadge />}
-                                </label>
-                                <input
-                                    type="password"
-                                    name="IMAGE_API_KEY"
-                                    value={keys.IMAGE_API_KEY || ""}
-                                    placeholder={getPlaceholder("IMAGE_API_KEY")}
-                                    onChange={handleChange}
-                                    className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    OpenAI API Key (Copywriting)
-                                    {savedKeys.OPENAI_API_KEY && <SavedBadge />}
-                                </label>
-                                <input
-                                    type="password"
-                                    name="OPENAI_API_KEY"
-                                    value={keys.OPENAI_API_KEY || ""}
-                                    placeholder={getPlaceholder("OPENAI_API_KEY")}
-                                    onChange={handleChange}
-                                    className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    OCR API Key (Tag Scanning)
-                                    {savedKeys.OCR_API_KEY && <SavedBadge />}
-                                </label>
-                                <input
-                                    type="password"
-                                    name="OCR_API_KEY"
-                                    value={keys.OCR_API_KEY || ""}
-                                    placeholder={getPlaceholder("OCR_API_KEY")}
-                                    onChange={handleChange}
-                                    className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                        </div>
-                    </div>
 
                     {/* WooCommerce */}
                     <div>
