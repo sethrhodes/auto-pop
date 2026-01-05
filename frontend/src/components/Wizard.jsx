@@ -258,6 +258,7 @@ function Wizard() {
   const handlePublish = async (finalData) => {
     setLoading(true);
     try {
+
       const payload = {
         product: {
           ...finalData,
@@ -267,131 +268,122 @@ function Wizard() {
           gender: draftData?.gender || selectedGender || 'men',
           category: draftData?.category || 'top',
           isHooded: draftData?.isHooded !== undefined ? draftData.isHooded : false
-      const payload = {
-            product: {
-              ...finalData,
-              variants: finalData.variants, // Ensure variants are passed explicitly if needed, though ...finalData covers it.
-              id: draftData?.id || searchParams.get('productId'), // Pass ID to update existing draft instead of creating new
-              quantity: quantity,
-              gender: draftData?.gender || selectedGender || 'men',
-              category: draftData?.category || 'top',
-              isHooded: draftData?.isHooded !== undefined ? draftData.isHooded : false
-            }
-          };
+        }
+      };
 
-          const res = await fetch(`${BACKEND_URL}/api/publish`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(payload)
-          });
+      const res = await fetch(`${BACKEND_URL}/api/publish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
 
-          const data = await res.json();
-          if(res.ok) {
-            setStep(3); // Success
-    } else {
-      alert("Publish failed: " + (data.details || data.error || "Unknown error"));
+      const data = await res.json();
+      if (res.ok) {
+        setStep(3); // Success
+      } else {
+        alert("Publish failed: " + (data.details || data.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error during publish.");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error(err);
-    alert("Network error during publish.");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
 
 
-const handleReset = () => {
-  setStep(1);
-  setDraftData(null);
-  setProductData(null);
-  setQuantity(1);
-  setSelectedGender('men');
-};
+  const handleReset = () => {
+    setStep(1);
+    setDraftData(null);
+    setProductData(null);
+    setQuantity(1);
+    setSelectedGender('men');
+  };
 
-return (
-  <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" >
-    <div className="max-w-7xl mx-auto">
-      <header className="mb-10 text-center">
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">
-          Auto-Pop <span className="text-indigo-600">Studio</span>
-        </h1>
-        <p className="mt-2 text-gray-500">AI-Powered Product Creation Workflow</p>
-      </header>
+  return (
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" >
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-10 text-center">
+          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">
+            Auto-Pop <span className="text-indigo-600">Studio</span>
+          </h1>
+          <p className="mt-2 text-gray-500">AI-Powered Product Creation Workflow</p>
+        </header>
 
-      <main>
-        {step === 1 && (
-          <UploadStep onNext={handleUploadNext} isLoading={loading} />
-        )}
+        <main>
+          {step === 1 && (
+            <UploadStep onNext={handleUploadNext} isLoading={loading} />
+          )}
 
-        {step === 1.5 && (
-          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl shadow-lg min-h-[400px]">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 animate-pulse">Designing Your Collection...</h2>
-            <div className="w-full max-w-md bg-gray-200 rounded-full h-4 mb-4">
-              <div
-                className="bg-indigo-600 h-4 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${generatingProgress}%` }}
-              ></div>
+          {step === 1.5 && (
+            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl shadow-lg min-h-[400px]">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4 animate-pulse">Designing Your Collection...</h2>
+              <div className="w-full max-w-md bg-gray-200 rounded-full h-4 mb-4">
+                <div
+                  className="bg-indigo-600 h-4 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${generatingProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-gray-600 font-medium text-lg animate-fade-in-up">{statusMessage}</p>
+              <p className="text-gray-400 text-sm mt-2">This usually takes about 30-45 seconds.</p>
             </div>
-            <p className="text-gray-600 font-medium text-lg animate-fade-in-up">{statusMessage}</p>
-            <p className="text-gray-400 text-sm mt-2">This usually takes about 30-45 seconds.</p>
-          </div>
-        )}
+          )}
 
-        {step === 2 && (
-          <ProductEditor
-            draftData={draftData}
-            gender={selectedGender}
-            onPublish={handlePublish}
-            onSave={handleSaveDraft}
-            onBack={() => navigate('/')}
+          {step === 2 && (
+            <ProductEditor
+              draftData={draftData}
+              gender={selectedGender}
+              onPublish={handlePublish}
+              onSave={handleSaveDraft}
+              onBack={() => navigate('/')}
+            />
+          )}
+
+          {step === 3 && (
+            <div className="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+                <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Success!</h2>
+              <p className="text-gray-500 mb-8">Your product has been saved/published.</p>
+              <button
+                onClick={handleReset}
+                className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 font-bold"
+              >
+                Create Another Product
+              </button>
+            </div>
+          )}
+        </main>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
           />
         )}
 
-        {step === 3 && (
-          <div className="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
-              <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        {/* Global Loading Overlay */}
+        {loading && step !== 1.5 && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white p-8 rounded-xl shadow-2xl flex flex-col items-center animate-bounce-small">
+              <svg className="animate-spin h-10 w-10 text-indigo-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
+              <p className="text-gray-800 font-semibold text-lg">Processing...</p>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Success!</h2>
-            <p className="text-gray-500 mb-8">Your product has been saved/published.</p>
-            <button
-              onClick={handleReset}
-              className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 font-bold"
-            >
-              Create Another Product
-            </button>
           </div>
         )}
-      </main>
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-
-      {/* Global Loading Overlay */}
-      {loading && step !== 1.5 && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-xl shadow-2xl flex flex-col items-center animate-bounce-small">
-            <svg className="animate-spin h-10 w-10 text-indigo-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="text-gray-800 font-semibold text-lg">Processing...</p>
-          </div>
-        </div>
-      )}
-    </div>
-  </div >
-);
+      </div>
+    </div >
+  );
 }
 
 export default Wizard;
