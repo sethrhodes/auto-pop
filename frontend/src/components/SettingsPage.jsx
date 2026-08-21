@@ -1,18 +1,18 @@
 // frontend/src/components/SettingsPage.jsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { BACKEND_URL } from "../config";
 
 export default function SettingsPage() {
     const { token, user } = useAuth();
     const [keys, setKeys] = useState({
-        WC_BASE_URL: "",
-        WC_CONSUMER_KEY: "",
-        WC_CONSUMER_SECRET: "",
+        SHOPIFY_STORE_DOMAIN: "",
+        SHOPIFY_CLIENT_ID: "",
+        SHOPIFY_CLIENT_SECRET: "",
         RMS_HOST: "",
     });
     const [savedKeys, setSavedKeys] = useState({}); // { IMAGE_API_KEY: true, ... }
     const [status, setStatus] = useState("");
-    const BACKEND_URL = `http://${window.location.hostname}:3000`;
 
     useEffect(() => {
         fetchSettings();
@@ -80,7 +80,7 @@ export default function SettingsPage() {
     );
 
     // Check critical keys
-    const missingCriticalKeys = !savedKeys.WC_BASE_URL;
+    const missingCriticalKeys = !savedKeys.SHOPIFY_STORE_DOMAIN;
 
     return (
         <div className="p-4 sm:p-8 max-w-4xl mx-auto">
@@ -134,20 +134,25 @@ export default function SettingsPage() {
 
                 <div className="space-y-8">
 
-                    {/* WooCommerce */}
+                    {/* Shopify */}
                     <div>
-                        <h3 className="font-semibold text-lg text-gray-800 border-b pb-2 mb-4">WooCommerce Store</h3>
+                        <h3 className="font-semibold text-lg text-gray-800 border-b pb-2 mb-1">Shopify Store</h3>
+                        <p className="text-sm text-gray-500 mb-4">
+                            When connected, publishing auto-updates the matching product in your Shopify store by barcode.
+                            Create an app in the <span className="font-medium">Shopify Dev Dashboard</span> (dev.shopify.com), add product/inventory scopes,
+                            install it on your store, then copy the Client ID and Client Secret from the app's Settings.
+                        </p>
                         <div className="grid grid-cols-1 gap-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Store URL
-                                    {savedKeys.WC_BASE_URL && <SavedBadge />}
+                                    Store Domain
+                                    {savedKeys.SHOPIFY_STORE_DOMAIN && <SavedBadge />}
                                 </label>
                                 <input
                                     type="text"
-                                    name="WC_BASE_URL"
-                                    value={keys.WC_BASE_URL || ""}
-                                    placeholder="https://yourstore.com"
+                                    name="SHOPIFY_STORE_DOMAIN"
+                                    value={keys.SHOPIFY_STORE_DOMAIN || ""}
+                                    placeholder="your-store.myshopify.com"
                                     onChange={handleChange}
                                     className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
@@ -155,28 +160,28 @@ export default function SettingsPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Consumer Key
-                                        {savedKeys.WC_CONSUMER_KEY && <SavedBadge />}
+                                        Client ID
+                                        {savedKeys.SHOPIFY_CLIENT_ID && <SavedBadge />}
                                     </label>
                                     <input
                                         type="password"
-                                        name="WC_CONSUMER_KEY"
-                                        value={keys.WC_CONSUMER_KEY || ""}
-                                        placeholder={getPlaceholder("WC_CONSUMER_KEY")}
+                                        name="SHOPIFY_CLIENT_ID"
+                                        value={keys.SHOPIFY_CLIENT_ID || ""}
+                                        placeholder={getPlaceholder("SHOPIFY_CLIENT_ID")}
                                         onChange={handleChange}
                                         className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Consumer Secret
-                                        {savedKeys.WC_CONSUMER_SECRET && <SavedBadge />}
+                                        Client Secret
+                                        {savedKeys.SHOPIFY_CLIENT_SECRET && <SavedBadge />}
                                     </label>
                                     <input
                                         type="password"
-                                        name="WC_CONSUMER_SECRET"
-                                        value={keys.WC_CONSUMER_SECRET || ""}
-                                        placeholder={getPlaceholder("WC_CONSUMER_SECRET")}
+                                        name="SHOPIFY_CLIENT_SECRET"
+                                        value={keys.SHOPIFY_CLIENT_SECRET || ""}
+                                        placeholder={getPlaceholder("SHOPIFY_CLIENT_SECRET")}
                                         onChange={handleChange}
                                         className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
                                     />

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const BACKEND_URL = `http://${window.location.hostname}:3000`;
+import { BACKEND_URL } from '../config';
 
 export default function Dashboard() {
     const { token } = useAuth();

@@ -2,7 +2,7 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
 const crypto = require('crypto');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Initialize SQLite DB
 const sequelize = new Sequelize({
@@ -64,13 +64,15 @@ const Product = sequelize.define('Product', {
     user_id: { type: DataTypes.INTEGER, allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false },
     sku: { type: DataTypes.STRING, allowNull: true },
+    barcode: { type: DataTypes.STRING, allowNull: true }, // UPC/EAN used to match Shopify products
     price: { type: DataTypes.STRING, allowNull: true },
     description: { type: DataTypes.TEXT, allowNull: true },
     short_description: { type: DataTypes.TEXT, allowNull: true },
     gallery: { type: DataTypes.TEXT, allowNull: true }, // JSON string of gallery objects
     status: { type: DataTypes.STRING, defaultValue: 'draft' }, // 'draft', 'published'
     image_url: { type: DataTypes.STRING, allowNull: true }, // Main image
-    remote_id: { type: DataTypes.STRING, allowNull: true }, // WooCommerce ID
+    remote_id: { type: DataTypes.STRING, allowNull: true }, // WooCommerce ID or Shopify GID
+    remote_platform: { type: DataTypes.STRING, allowNull: true }, // 'woo' | 'shopify'
     variants: { type: DataTypes.TEXT, allowNull: true }, // JSON: [{ sku, size, color, qty, price }]
     front_image: { type: DataTypes.STRING, allowNull: true }, // Original Filename
     back_image: { type: DataTypes.STRING, allowNull: true }, // Original Filename
@@ -124,7 +126,11 @@ function decrypt(hash) {
 async function initDB() {
     try {
         await sequelize.authenticate();
-        await sequelize.sync({ alter: true }); // Create or Update tables
+        // Plain sync: creates missing tables but doesn't ALTER existing ones.
+        // (alter:true kept rebuilding tables on every boot, which SQLite's
+        // backup-table dance eventually corrupted. Schema changes now need an
+        // explicit migration script, like migrate_db.js.)
+        await sequelize.sync();
         console.log('Database connected and synced.');
     } catch (error) {
         console.error('Unable to connect to the database:', error);

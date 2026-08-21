@@ -1,5 +1,6 @@
 // frontend/src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from "react";
+import { BACKEND_URL } from "../config";
 
 const AuthContext = createContext();
 
@@ -32,9 +33,6 @@ export const AuthProvider = ({ children }) => {
     });
 
     const login = async (email, password) => {
-        // Dynamic URL
-        const BACKEND_URL = `http://${window.location.hostname}:3000`;
-
         const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -51,7 +49,6 @@ export const AuthProvider = ({ children }) => {
     };
 
     const register = async (email, password, extras = {}) => {
-        const BACKEND_URL = `http://${window.location.hostname}:3000`;
         const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -69,6 +66,21 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
     };
+
+    // Validate the stored token once on load. If the server rejects it
+    // (e.g. secret rotated, token expired), clear the session so the user
+    // lands on the login screen instead of pages erroring on "Forbidden".
+    useEffect(() => {
+        if (!token) return;
+        fetch(`${BACKEND_URL}/api/settings`, {
+            headers: { Authorization: `Bearer ${token}` }
+        }).then(res => {
+            if (res.status === 401 || res.status === 403) {
+                console.warn("Stored session is no longer valid, logging out.");
+                logout();
+            }
+        }).catch(() => { /* network errors: leave session alone */ });
+    }, [token]);
 
     return (
         <AuthContext.Provider value={{ token, user, login, register, logout, isAuthenticated: !!token }}>

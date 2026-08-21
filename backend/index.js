@@ -1,12 +1,13 @@
 // backend/index.js
 const express = require("express");
-require("dotenv").config();
 const path = require("path");
+// Load .env from the backend folder regardless of where node was launched from
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const fs = require("fs");
 const multer = require("multer");
 const cors = require("cors");
 
-const { createTestProduct, createProduct, updateProduct } = require("./wooClient");
+const shopify = require("./shopifyClient");
 const { generateOnModelAndGhost } = require("./imageGenClient");
 const { generateProductCopy } = require("./copyClient");
 const { extractTagText } = require("./ocrClient");
@@ -23,7 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads (for frontend preview)
 // Serve static files from uploads (for frontend preview)
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", authenticateToken, express.static(path.join(__dirname, "uploads")));
 
 // SERVE FRONTEND (Production)
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
@@ -233,6 +234,7 @@ app.post("/api/products", authenticateToken, async (req, res) => {
         await existing.update({
           name: product.name,
           sku: product.sku,
+          barcode: product.barcode,
           price: product.price,
           description: product.description,
           short_description: product.short_description,
@@ -285,6 +287,7 @@ app.post("/api/products", authenticateToken, async (req, res) => {
         user_id: req.user.id,
         name: product.name,
         sku: product.sku,
+        barcode: product.barcode,
         price: product.price,
         description: product.description,
         short_description: product.short_description,
@@ -345,7 +348,8 @@ app.get("/api/products/:id", authenticateToken, async (req, res) => {
 
 /**
  * 3. PUBLISH ENDPOINT
- * Takes final data, creates Woo product, AND saves to local History.
+ * Auto-updates the matching Shopify product by BARCODE (creates a draft if
+ * no match), and saves to local History.
  */
 app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
   try {
@@ -356,65 +360,47 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
       return res.status(400).json({ error: "Product name and price are required" });
     }
 
+    if (!shopify.isConfigured(req.userKeys)) {
+      return res.status(400).json({ error: "Shopify store not connected. Add your Store Domain, Client ID and Client Secret in Settings." });
+    }
+
     console.log("Publishing product:", product.name);
 
-    // Format images for WooCommerce: [{ src: 'url' }, ...]
-    const wooImages = (product.gallery || []).map(img => ({
-      src: img.url
-    }));
-
-    let wooProduct;
     let localProduct;
-
-    // Check if we should UPDATE or CREATE
     if (product.id) {
       localProduct = await Product.findOne({ where: { id: product.id, user_id: req.user.id } });
     }
 
-    if (localProduct && localProduct.remote_id) {
-      // UPDATE Existing Woo Product
-      console.log(`Updating existing Woo Product ${localProduct.remote_id}...`);
-      wooProduct = await updateProduct(localProduct.remote_id, {
-        name: product.name,
-        price: product.price,
-        sku: product.sku,
-        quantity: product.quantity || 1,
-        description: product.description,
-        short_description: product.short_description,
-        images: wooImages,
-        gender: product.gender,
-        category: product.category,
-        isHooded: product.isHooded
+    const barcode = product.barcode || product.sku;
+    console.log(`Publishing to Shopify (barcode match: ${barcode})...`);
 
-      }, req.userKeys);
-    } else {
-      // CREATE New Woo Product
-      wooProduct = await createProduct({
-        name: product.name,
-        price: product.price,
-        sku: product.sku,
-        quantity: product.quantity || 1,
-        description: product.description,
-        short_description: product.short_description,
-        images: wooImages,
-        gender: product.gender,
-        category: product.category,
-        isHooded: product.isHooded,
-        apiKeys: req.userKeys
-      });
-    }
+    const { product: remoteProduct, action: shopifyAction } = await shopify.publishProductByBarcode({
+      name: product.name,
+      price: product.price,
+      barcode,
+      sku: product.sku,
+      quantity: product.quantity || 1,
+      description: product.description,
+      short_description: product.short_description,
+      images: (product.gallery || []).map(img => img.url),
+      variants: product.variants || (localProduct?.variants ? JSON.parse(localProduct.variants) : []),
+      gender: product.gender,
+      apiKeys: req.userKeys
+    });
 
     // Save/Update to Local DB History
-    const mainImage = wooImages.length > 0 ? wooImages[0].src : null;
+    const mainImage = (product.gallery || [])[0]?.url || null;
 
     if (localProduct) {
       await localProduct.update({
         name: product.name,
         sku: product.sku,
+        barcode: product.barcode || product.sku,
         price: product.price,
         status: 'published',
         image_url: mainImage,
-        remote_id: wooProduct.id.toString(),
+        remote_id: remoteProduct.id.toString(),
+        remote_platform: 'shopify',
         gender: product.gender,
         category: product.category,
         is_hooded: product.isHooded
@@ -424,21 +410,23 @@ app.post("/api/publish", authenticateToken, loadUserKeys, async (req, res) => {
         user_id: req.user.id,
         name: product.name,
         sku: product.sku,
+        barcode: product.barcode || product.sku,
         price: product.price,
         status: 'published',
         image_url: mainImage,
-        remote_id: wooProduct.id.toString(),
+        remote_id: remoteProduct.id.toString(),
+        remote_platform: 'shopify',
         gender: product.gender,
         category: product.category,
         is_hooded: product.isHooded
       });
     }
 
-    res.json({ success: true, product: wooProduct });
+    res.json({ success: true, product: remoteProduct, platform: 'shopify', action: shopifyAction });
 
   } catch (err) {
     if (err.response) {
-      console.error("WooCommerce Error:", JSON.stringify(err.response.data, null, 2));
+      console.error("Store API Error:", JSON.stringify(err.response.data, null, 2));
       // Send the Woo error details to the frontend
       return res.status(500).json({ error: "Publish failed", details: JSON.stringify(err.response.data) });
     }
@@ -472,7 +460,15 @@ app.listen(port, '0.0.0.0', async () => {
 });
 
 // WEBHOOK HANDLER
-app.post("/api/webhook/order-created", async (req, res) => {
+app.post("/api/webhook/order-created", (req, res, next) => {
+  // Webhooks carry no user token, so gate on a shared secret instead.
+  // Configure the same value as WEBHOOK_SECRET on the sending platform.
+  const expected = process.env.WEBHOOK_SECRET;
+  if (!expected) return res.status(503).send("Webhook not configured");
+  const provided = req.headers["x-webhook-secret"] || req.query.secret;
+  if (provided !== expected) return res.sendStatus(401);
+  next();
+}, async (req, res) => {
   // Webhooks from Woo don't have user tokens. Sync Engine must rely on System Creds?
   // Or we find the user based on API keys? 
   // For MVP: Sync Engine is "Admin/System" level using .env or a specific user.

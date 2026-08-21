@@ -119,12 +119,25 @@ function parseTagMetadata(rawText = "") {
     }
   }
 
+  // Barcode: UPC-A (12), EAN-13 (13), or similar long digit runs (11-14),
+  // scanned bottom-up since the barcode number usually sits under the bars.
+  let barcode = "";
+  for (const line of reverseLines) {
+    const digits = line.replace(/[^0-9]/g, "");
+    const match = line.match(/\b(\d{11,14})\b/) || (digits.length >= 11 && digits.length <= 14 ? [digits, digits] : null);
+    if (match) {
+      barcode = match[1];
+      break;
+    }
+  }
+
   return {
     brand: brandLine,
     productType: cleanProductType || productLine,
     color,
     size,
     sku: cleanSku,
+    barcode,
     price,
     rawLines: lines,
   };

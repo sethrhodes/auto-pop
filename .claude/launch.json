@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "auto-pop",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["backend/index.js"],
+      "port": 3000
+    }
+  ]
+}

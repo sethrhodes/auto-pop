@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LivePreviewMode from './LivePreviewMode';
 
-// You might configure this via environment variable or prop
-// Configure backend URL to match current hostname (enables local network testing)
-const BACKEND_URL = `http://${window.location.hostname}:3000`;
+import { BACKEND_URL } from '../config';
 
 export default function ProductEditor({ draftData, gender, onPublish, onSave, onBack }) { // Added gender, onSave
     const { token } = useAuth();
@@ -13,6 +11,7 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
         name: '',
         price: '',
         sku: '',
+        barcode: '',
         description: '',
         short_description: '',
     });
@@ -32,6 +31,7 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
                 name: copy.title || 'Product Title',
                 price: analysis?.detected?.price || '54.95',
                 sku: analysis?.detected?.sku || '',
+                barcode: analysis?.detected?.barcode || '',
                 description: copy.description || '',
                 short_description: copy.subtitle || ''
             });
@@ -239,6 +239,19 @@ export default function ProductEditor({ draftData, gender, onPublish, onSave, on
                                         className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border"
                                     />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Barcode (UPC/EAN)</label>
+                                <input
+                                    type="text"
+                                    name="barcode"
+                                    value={formData.barcode}
+                                    onChange={handleTextChange}
+                                    placeholder="Leave blank to match by SKU"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 border"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Used to find and auto-update the matching product in your Shopify store.</p>
                             </div>
 
                             <div>

@@ -1,6 +1,5 @@
 // backend/syncEngine.js
 const rms = require('./rmsClient');
-const woo = require('./wooClient');
 const { Product } = require('./database');
 
 let isRunning = false;

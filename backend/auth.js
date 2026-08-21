@@ -55,9 +55,10 @@ async function loadUserKeys(req, res, next) {
             OPENAI_API_KEY: userKeys.OPENAI_API_KEY || process.env.OPENAI_API_KEY,
             IMAGE_API_KEY: userKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY,
             OCR_API_KEY: userKeys.OCR_API_KEY || process.env.OCR_API_KEY, // Added this
-            WC_BASE_URL: userKeys.WC_BASE_URL || process.env.WC_BASE_URL,
-            WC_CONSUMER_KEY: userKeys.WC_CONSUMER_KEY || process.env.WC_CONSUMER_KEY,
-            WC_CONSUMER_SECRET: userKeys.WC_CONSUMER_SECRET || process.env.WC_CONSUMER_SECRET,
+            SHOPIFY_STORE_DOMAIN: userKeys.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE_DOMAIN,
+            SHOPIFY_ADMIN_TOKEN: userKeys.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN,
+            SHOPIFY_CLIENT_ID: userKeys.SHOPIFY_CLIENT_ID || process.env.SHOPIFY_CLIENT_ID,
+            SHOPIFY_CLIENT_SECRET: userKeys.SHOPIFY_CLIENT_SECRET || process.env.SHOPIFY_CLIENT_SECRET,
             RMS_HOST: userKeys.RMS_HOST || process.env.RMS_HOST,
             RMS_USER: userKeys.RMS_USER || process.env.RMS_USER,
             RMS_PASSWORD: userKeys.RMS_PASSWORD || process.env.RMS_PASSWORD,
@@ -78,6 +79,13 @@ async function loadUserKeys(req, res, next) {
 const { sendWelcomeEmail } = require('./emailClient');
 
 async function register(req, res) {
+    // Closed by default so the app can be exposed publicly (LAN, tunnel, host)
+    // without strangers signing up and spending the .env API keys that
+    // loadUserKeys falls back to. Set ALLOW_REGISTRATION=true to reopen.
+    if (String(process.env.ALLOW_REGISTRATION).toLowerCase() !== "true") {
+        return res.status(403).send("Registration is currently closed");
+    }
+
     try {
         const { email, password, first_name, last_name, company_name } = req.body;
 

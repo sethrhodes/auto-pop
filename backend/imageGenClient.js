@@ -101,7 +101,7 @@ async function uploadToClaid(filePath, apiKey) {
 /**
  * Helper to start a Claid generation task with retries for 429
  */
-async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio = "3:4", apiKey, customBgUrl = null) {
+async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio = "3:4", apiKey, customBgUrl = null, modelUrl = null) {
   const payload = {
     input: {
       clothing: Array.isArray(imageUrl) ? imageUrl : [imageUrl]
@@ -112,6 +112,13 @@ async function triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, 
       aspect_ratio: aspectRatio
     },
   };
+
+  // Pin a specific model (custom or library) for consistent shots across products.
+  // Without this, Claid picks a random suitable model per generation.
+  if (modelUrl) {
+    payload.input.model = modelUrl;
+    console.log(`[${taskId}] Using custom model image.`);
+  }
 
   if (customBgUrl) {
     console.log(`[${taskId}] Note: Custom background image URL provided (${customBgUrl}) but API only supports text prompts. Using prompt: "${backgroundPrompt}"`);
@@ -190,13 +197,64 @@ async function pollClaidTask(taskId, resultUrl, apiKey) {
 /**
  * Helper to run a full generation cycle (Trigger + Poll)
  */
-async function runGenerationTask(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl = null) {
-  const task = await triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl);
+async function runGenerationTask(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl = null, modelUrl = null) {
+  const task = await triggerClaidGeneration(taskId, imageUrl, pose, backgroundPrompt, aspectRatio, apiKey, customBgUrl, modelUrl);
   const url = await pollClaidTask(taskId, task.result_url, apiKey);
   return url;
 }
 
+/**
+ * Find and upload a model image from the user's model pool, if provided.
+ *
+ * Pool files live in uploads/ and rotate across products:
+ *   custom_model_men.jpg, custom_model_men_2.jpg, ...   (men's pool)
+ *   custom_model_women.jpg, custom_model_women_2.jpg, ... (women's pool)
+ *   custom_model.jpg, custom_model_2.jpg, ...            (fallback pool)
+ *
+ * The pick is deterministic per product (seeded by the product's photo
+ * filename) so front/back/lifestyle shots AND later regenerations of the
+ * same product always land on the same model, while different products
+ * rotate through the pool. Returns a Claid temp URL, or null if no pool.
+ */
+async function getCustomModelUrl(gender, apiKey, seed = "") {
+  // Normalize UI gender values ('womens' -> 'women', 'mens' -> 'men') to pool filenames
+  gender = String(gender || "").toLowerCase().replace(/^womens$/, "women").replace(/^mens$/, "men");
+  const uploads = path.join(__dirname, "uploads");
+  const poolFor = (prefix) =>
+    fs.readdirSync(uploads)
+      .filter(f => new RegExp(`^${prefix}(_\\d+)?\\.(jpe?g|png)$`, "i").test(f))
+      .sort();
 
+  let pool = poolFor(`custom_model_${gender}`);
+  if (pool.length === 0) pool = poolFor("custom_model");
+  if (pool.length === 0) return null;
+
+  // Simple stable hash of the seed → index into the pool
+  let hash = 0;
+  for (const ch of String(seed)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const chosen = pool[hash % pool.length];
+
+  console.log(`Model pool (${pool.length} ${gender || "any"}): picked ${chosen}`);
+  try {
+    return await uploadToClaid(path.join(uploads, chosen), apiKey);
+  } catch (e) {
+    console.error(`Failed to upload model image ${chosen}:`, e.message);
+    return null;
+  }
+}
+
+
+
+/**
+ * Jeans the model wears in generated shots, by gender.
+ * Only used for tops — for a "bottom" product the garment IS the pants.
+ */
+function jeansTermFor(gender) {
+  const g = String(gender || "").toLowerCase();
+  if (g === "men" || g === "mens") return "loose-fitting relaxed blue jeans";
+  if (g === "women" || g === "womens") return "regular-fit straight-leg blue jeans, not tight or skinny";
+  return "blue jeans";
+}
 
 async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilename = null, gender = "female", category = "top", isHooded = true, apiKeys = {} }) {
   const apiKey = apiKeys.IMAGE_API_KEY || process.env.IMAGE_API_KEY;
@@ -261,39 +319,41 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilena
   // Helper for text injection
   const textPrompt = logoText ? `, shirt design features text "${logoText}" written clearly` : "";
 
+  const jeansTerm = jeansTermFor(gender);
+
   // Define Prompt Templates
   const getTopPrompts = (view, hoodState) => {
     if (!isHooded) {
       // Non-Hooded (T-Shirt / Crewneck)
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt${textPrompt}, crew neck, front view, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, back view, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt${textPrompt}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt${textPrompt}, crew neck, front view, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of shirt fully visible, no face visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt with ${jeansTerm}${textPrompt}, preserve clothing details, sharp text, high fidelity texture`;
     } else {
       // Hooded (Default)
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie${textPrompt}, hood down resting on shoulders, NOT on head, front view, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing${textPrompt}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie${textPrompt}, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of hoodie fully visible, hood up on head, no face visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath${textPrompt}, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
 
   // Shot 1 Prompts (Pose Only)
   const shot1Prompt = isBottom
-    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus`
+    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing with a plain white t-shirt on top, no upper body focus`
     : getTopPrompts('front');
 
   // Shot 2 Prompts (Pose Only)
   const shot2Prompt = isBottom
-    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus`
+    ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing with a plain white t-shirt on top, no upper body focus`
     : getTopPrompts('back');
 
   // Shot 3 Prompts (Lifestyle Pose)
   const shot3Prompt = isBottom
-    ? `lifestyle photography of single ${modelTerm} walking away, focus on pants/shorts, wearing the clothing`
+    ? `lifestyle photography of single ${modelTerm} walking away, focus on pants/shorts, wearing the clothing with a plain white t-shirt on top`
     : getTopPrompts('lifestyle');
 
   // Backgrounds
   // User requested "light grey" specifically.
-  const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
+  const STANDARD_BG = "light grey seamless studio backdrop, hex color #E4E4E4, evenly lit, soft shadows";
   const BEACH_BG = "rugged northern california beach on a sunny day, bright natural lighting, blue sky, cliffs in background, cinematic";
 
   // Check for Custom Background File
@@ -314,18 +374,21 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilena
   const frontInput = frontUrl;
   const backInput = backUrl;
 
+  // Model pool: rotates across products, stays consistent within one (seeded by front image).
+  const modelUrl = await getCustomModelUrl(gender, apiKey, frontFilename);
+
   // 2. Trigger PARALLEL Model Generations (3 Shots)
   console.log("Starting parallel generation for 3 shots...");
 
   const results = await Promise.allSettled([
     // Shot 1: Front
-    runGenerationTask("SHOT_1", frontInput, shot1Prompt, STANDARD_BG, "3:4", apiKey),
+    runGenerationTask("SHOT_1", frontInput, shot1Prompt, STANDARD_BG, "3:4", apiKey, null, modelUrl),
 
     // Shot 2: Back
-    runGenerationTask("SHOT_2", backInput, shot2Prompt, STANDARD_BG, "3:4", apiKey),
+    runGenerationTask("SHOT_2", backInput, shot2Prompt, STANDARD_BG, "3:4", apiKey, null, null),
 
     // Shot 3: Lifestyle
-    runGenerationTask("SHOT_3", frontInput, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl)
+    runGenerationTask("SHOT_3", frontInput, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl, modelUrl)
   ]);
 
   // Helper to safely get URL or null
@@ -387,21 +450,23 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   // --- PROMPT LOGIC ---
   const isBottom = category === "bottom";
 
+  const jeansTerm = jeansTermFor(gender);
+
   // Re-define helper inside scope (or could move out)
   const getTopPrompts = (view) => {
     if (!isHooded) {
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, back view, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of shirt fully visible, no face visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt with ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
     } else {
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood down resting on shoulders, NOT on head, front view, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood up on head, back view, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the clothing, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of hoodie fully visible, hood up on head, no face visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, looks like a surfer, messy hair, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
 
   let task, taskId;
-  const STANDARD_BG = "very light grey professional studio background, hex color #F5F5F5, soft shadows";
+  const STANDARD_BG = "light grey seamless studio backdrop, hex color #E4E4E4, evenly lit, soft shadows";
   const BEACH_BG = "rugged northern california beach on a sunny day, bright natural lighting, blue sky, cliffs in background, cinematic";
 
   // Check for Custom Background File
@@ -416,32 +481,35 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
     }
   }
 
+  // Same seed as the original generation → regens land on the same model.
+  const modelUrl = await getCustomModelUrl(gender, apiKey, frontFilename);
+
   if (shotIndex === 0) {
     // Shot 1: Front
     taskId = "REGEN_SHOT_1";
     const prompt = isBottom
-      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing, no upper body focus`
+      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, front view, wearing the clothing with a plain white t-shirt on top, no upper body focus`
       : getTopPrompts('front');
 
-    task = await triggerClaidGeneration(taskId, frontUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey);
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey, null, modelUrl);
 
   } else if (shotIndex === 1) {
     // Shot 2: Back
     taskId = "REGEN_SHOT_2";
     const prompt = isBottom
-      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing, no upper body focus`
+      ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing with a plain white t-shirt on top, no upper body focus`
       : getTopPrompts('back');
 
-    task = await triggerClaidGeneration(taskId, backUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey);
+    task = await triggerClaidGeneration(taskId, backUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey, null, null); // no model ref: front-facing reference forces a front view
 
   } else if (shotIndex === 2) {
     // Shot 3: Lifestyle
     taskId = "REGEN_SHOT_3";
     const prompt = isBottom
-      ? `lifestyle photography of single ${modelTerm} walking away, focus on pants/shorts, wearing the clothing`
+      ? `lifestyle photography of single ${modelTerm} walking away, focus on pants/shorts, wearing the clothing with a plain white t-shirt on top`
       : getTopPrompts('lifestyle');
 
-    task = await triggerClaidGeneration(taskId, frontUrl, prompt, BEACH_BG, SHOT_ASPECT_RATIO, apiKey, customBgUrl);
+    task = await triggerClaidGeneration(taskId, frontUrl, prompt, BEACH_BG, SHOT_ASPECT_RATIO, apiKey, customBgUrl, modelUrl);
   } else {
     throw new Error("Invalid shotIndex (0-2)");
   }
@@ -452,5 +520,9 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
 
 module.exports = {
   generateOnModelAndGhost,
-  generateSingleShot
+  generateSingleShot,
+  // Exposed for scripts/abTest.js (provider comparison harness)
+  uploadToClaid,
+  runGenerationTask,
+  preprocessImage
 };

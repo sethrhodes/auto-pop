@@ -5,8 +5,7 @@ import UploadStep from "./UploadStep";
 import ProductEditor from "./ProductEditor";
 import Toast from "./Toast";
 
-// Configure backend URL to match current hostname (enables local network testing)
-const BACKEND_URL = `http://${window.location.hostname}:3000`;
+import { BACKEND_URL } from '../config';
 
 function Wizard() {
   const { token } = useAuth();
@@ -79,7 +78,8 @@ function Wizard() {
             },
             detected: {
               price: product.price,
-              sku: product.sku
+              sku: product.sku,
+              barcode: product.barcode
             }
           },
           images: {
