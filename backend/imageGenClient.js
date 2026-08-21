@@ -246,6 +246,17 @@ async function getCustomModelUrl(gender, apiKey, seed = "") {
 
 
 /**
+ * Identity lock for shots where the model's face is visible.
+ *
+ * The real anchor is input.model (the pinned pool photo) — this is prompt
+ * reinforcement on top of it, not a substitute. Deliberately NOT applied to
+ * back views ("no face visible") or to bottoms shots (waist-down / walking
+ * away), where it would contradict the framing.
+ */
+const FACE_PRESERVE =
+  "exact same face as the reference model, identical facial features and skin tone, do not alter replace or beautify the face, preserve model identity";
+
+/**
  * Jeans the model wears in generated shots, by gender.
  * Only used for tops — for a "bottom" product the garment IS the pants.
  */
@@ -325,14 +336,14 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilena
   const getTopPrompts = (view, hoodState) => {
     if (!isHooded) {
       // Non-Hooded (T-Shirt / Crewneck)
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt${textPrompt}, crew neck, front view, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt${textPrompt}, crew neck, front view, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
       if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of shirt fully visible, no face visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt with ${jeansTerm}, flip-flops on feet${textPrompt}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt with ${jeansTerm}, flip-flops on feet${textPrompt}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     } else {
       // Hooded (Default)
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie${textPrompt}, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie${textPrompt}, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
       if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of hoodie fully visible, hood up on head, no face visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath, flip-flops on feet${textPrompt}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath, flip-flops on feet${textPrompt}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
 
@@ -455,13 +466,13 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   // Re-define helper inside scope (or could move out)
   const getTopPrompts = (view) => {
     if (!isHooded) {
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on shirt, crew neck, front view, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
       if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of shirt fully visible, no face visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt with ${jeansTerm}, flip-flops on feet, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, casual street style, wearing the shirt with ${jeansTerm}, flip-flops on feet, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     } else {
-      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'front') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, focus on hoodie, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
       if (view === 'back') return `fashion photography of ${modelTerm}, waist up shot, torso only, no legs, photographed from behind, model facing away from camera, back of hoodie fully visible, hood up on head, no face visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
-      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath, flip-flops on feet, preserve clothing details, sharp text, high fidelity texture`;
+      if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath, flip-flops on feet, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
 
