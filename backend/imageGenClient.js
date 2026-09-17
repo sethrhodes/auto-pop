@@ -216,7 +216,28 @@ async function runGenerationTask(taskId, imageUrl, pose, backgroundPrompt, aspec
  * same product always land on the same model, while different products
  * rotate through the pool. Returns a Claid temp URL, or null if no pool.
  */
-async function getCustomModelUrl(gender, apiKey, seed = "") {
+/**
+ * Claid inherits composition from the reference image in input.model, so a
+ * full-body model photo drags shots 1 and 2 wide no matter what the pose text
+ * asks for. Cache a waist-up crop (top 55%) and feed that for the close shots,
+ * keeping the full-body original for the lifestyle shot.
+ */
+async function upperBodyCrop(srcPath) {
+  const dir = path.join(path.dirname(srcPath), ".model_crops");
+  const out = path.join(dir, path.basename(srcPath, path.extname(srcPath)) + "_upper.jpg");
+  try {
+    const src = fs.statSync(srcPath);
+    if (fs.existsSync(out) && fs.statSync(out).mtimeMs >= src.mtimeMs) return out; // cached
+  } catch {}
+  fs.mkdirSync(dir, { recursive: true });
+  const meta = await sharp(srcPath).metadata();
+  const height = Math.max(1, Math.round(meta.height * 0.55));
+  await sharp(srcPath).extract({ left: 0, top: 0, width: meta.width, height }).jpeg({ quality: 92 }).toFile(out);
+  console.log(`Cropped model reference to upper body: ${path.basename(out)} (${meta.width}x${height})`);
+  return out;
+}
+
+async function getCustomModelUrl(gender, apiKey, seed = "", framing = "full") {
   // Normalize UI gender values ('womens' -> 'women', 'mens' -> 'men') to pool filenames
   gender = String(gender || "").toLowerCase().replace(/^womens$/, "women").replace(/^mens$/, "men");
   const uploads = path.join(__dirname, "uploads");
@@ -234,9 +255,11 @@ async function getCustomModelUrl(gender, apiKey, seed = "") {
   for (const ch of String(seed)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   const chosen = pool[hash % pool.length];
 
-  console.log(`Model pool (${pool.length} ${gender || "any"}): picked ${chosen}`);
+  console.log(`Model pool (${pool.length} ${gender || "any"}): picked ${chosen} [${framing}]`);
   try {
-    return await uploadToClaid(path.join(uploads, chosen), apiKey);
+    let modelPath = path.join(uploads, chosen);
+    if (framing === "upper") modelPath = await upperBodyCrop(modelPath);
+    return await uploadToClaid(modelPath, apiKey);
   } catch (e) {
     console.error(`Failed to upload model image ${chosen}:`, e.message);
     return null;
@@ -385,21 +408,25 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilena
   const frontInput = frontUrl;
   const backInput = backUrl;
 
-  // Model pool: rotates across products, stays consistent within one (seeded by front image).
-  const modelUrl = await getCustomModelUrl(gender, apiKey, frontFilename);
+  // Model pool: rotates across products, stays consistent within one (seeded by
+  // front image). Same pool pick, two framings — see upperBodyCrop().
+  const [modelUrlUpper, modelUrlFull] = await Promise.all([
+    getCustomModelUrl(gender, apiKey, frontFilename, "upper"),
+    getCustomModelUrl(gender, apiKey, frontFilename, "full"),
+  ]);
 
   // 2. Trigger PARALLEL Model Generations (3 Shots)
   console.log("Starting parallel generation for 3 shots...");
 
   const results = await Promise.allSettled([
     // Shot 1: Front
-    runGenerationTask("SHOT_1", frontInput, shot1Prompt, STANDARD_BG, "3:4", apiKey, null, modelUrl),
+    runGenerationTask("SHOT_1", frontInput, shot1Prompt, STANDARD_BG, "3:4", apiKey, null, modelUrlUpper),
 
     // Shot 2: Back
-    runGenerationTask("SHOT_2", backInput, shot2Prompt, STANDARD_BG, "3:4", apiKey, null, modelUrl),
+    runGenerationTask("SHOT_2", backInput, shot2Prompt, STANDARD_BG, "3:4", apiKey, null, modelUrlUpper),
 
     // Shot 3: Lifestyle
-    runGenerationTask("SHOT_3", frontInput, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl, modelUrl)
+    runGenerationTask("SHOT_3", frontInput, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl, modelUrlFull)
   ]);
 
   // Helper to safely get URL or null
@@ -493,7 +520,10 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   }
 
   // Same seed as the original generation → regens land on the same model.
-  const modelUrl = await getCustomModelUrl(gender, apiKey, frontFilename);
+  // Shots 0/1 are close-ups, shot 2 is full body — match the reference framing.
+  const modelUrl = await getCustomModelUrl(
+    gender, apiKey, frontFilename, shotIndex === 2 ? "full" : "upper"
+  );
 
   if (shotIndex === 0) {
     // Shot 1: Front
