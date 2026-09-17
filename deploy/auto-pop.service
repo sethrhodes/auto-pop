@@ -1,0 +1,25 @@
+[Unit]
+Description=auto-pop backend
+After=network.target
+
+[Service]
+Type=simple
+User=autopop
+Group=autopop
+WorkingDirectory=/opt/auto-pop/backend
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+# Secrets come from /opt/auto-pop/backend/.env, loaded by dotenv at startup.
+StandardOutput=journal
+StandardError=journal
+
+# The app only ever needs to write its own data directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/auto-pop/backend
+
+[Install]
+WantedBy=multi-user.target
