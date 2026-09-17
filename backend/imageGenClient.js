@@ -337,12 +337,12 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilena
     if (!isHooded) {
       // Non-Hooded (T-Shirt / Crewneck)
       if (view === 'front') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, focus on shirt${textPrompt}, crew neck, front view, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, photographed from behind, model facing away from camera, back of shirt fully visible, no face visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, back of the head fully in frame, cropped at the waist, no legs visible, strictly rear view photographed from directly behind, model facing completely away from camera with back to the viewer, back of the shirt fully visible, back of the head visible, face and front of body must NOT be visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
       if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, full body shot from head to feet, entire body including shoes fully in frame, casual street style, wearing the shirt with ${jeansTerm}, flip-flops on feet${textPrompt}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     } else {
       // Hooded (Default)
       if (view === 'front') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, focus on hoodie${textPrompt}, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, photographed from behind, model facing away from camera, back of hoodie fully visible, hood up on head, no face visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, back of the head fully in frame, cropped at the waist, no legs visible, strictly rear view photographed from directly behind, model facing completely away from camera with back to the viewer, back of the hoodie fully visible, hood up on head, face and front of body must NOT be visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
       if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, full body shot from head to feet, entire body including shoes fully in frame, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath, flip-flops on feet${textPrompt}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
@@ -396,7 +396,7 @@ async function generateOnModelAndGhost({ frontFilename, backFilename, logoFilena
     runGenerationTask("SHOT_1", frontInput, shot1Prompt, STANDARD_BG, "3:4", apiKey, null, modelUrl),
 
     // Shot 2: Back
-    runGenerationTask("SHOT_2", backInput, shot2Prompt, STANDARD_BG, "3:4", apiKey, null, null),
+    runGenerationTask("SHOT_2", backInput, shot2Prompt, STANDARD_BG, "3:4", apiKey, null, modelUrl),
 
     // Shot 3: Lifestyle
     runGenerationTask("SHOT_3", frontInput, shot3Prompt, BEACH_BG, "3:4", apiKey, customBgUrl, modelUrl)
@@ -467,11 +467,11 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
   const getTopPrompts = (view) => {
     if (!isHooded) {
       if (view === 'front') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, focus on shirt, crew neck, front view, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, photographed from behind, model facing away from camera, back of shirt fully visible, no face visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, back of the head fully in frame, cropped at the waist, no legs visible, strictly rear view photographed from directly behind, model facing completely away from camera with back to the viewer, back of the shirt fully visible, back of the head visible, face and front of body must NOT be visible, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
       if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, full body shot from head to feet, entire body including shoes fully in frame, casual street style, wearing the shirt with ${jeansTerm}, flip-flops on feet, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     } else {
       if (view === 'front') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, focus on hoodie, hood fully down hanging behind neck and shoulders, absolutely NOT on head, head hair and face fully visible, front view, no t-shirt or undershirt layered under the hoodie, wearing ${jeansTerm}, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
-      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, entire head and face fully in frame, cropped at the waist, no legs visible, photographed from behind, model facing away from camera, back of hoodie fully visible, hood up on head, no face visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
+      if (view === 'back') return `fashion photography of ${modelTerm}, medium shot framed from the waist to the top of the head, back of the head fully in frame, cropped at the waist, no legs visible, strictly rear view photographed from directly behind, model facing completely away from camera with back to the viewer, back of the hoodie fully visible, hood up on head, face and front of body must NOT be visible, no t-shirt layered under the hoodie, wearing ${jeansTerm}, preserve clothing details, high fidelity texture`;
       if (view === 'lifestyle') return `lifestyle photography of single ${modelTerm} standing, full body shot from head to feet, entire body including shoes fully in frame, wearing the hoodie over ${jeansTerm}, no t-shirt layered underneath, flip-flops on feet, ${FACE_PRESERVE}, preserve clothing details, sharp text, high fidelity texture`;
     }
   };
@@ -511,7 +511,7 @@ async function generateSingleShot({ frontFilename, backFilename, gender = "femal
       ? `fashion photography of ${modelTerm}, waist down shot, focus on legs and pants/shorts, back view, wearing the clothing with a plain white t-shirt on top, no upper body focus`
       : getTopPrompts('back');
 
-    task = await triggerClaidGeneration(taskId, backUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey, null, null); // no model ref: front-facing reference forces a front view
+    task = await triggerClaidGeneration(taskId, backUrl, prompt, STANDARD_BG, SHOT_ASPECT_RATIO, apiKey, null, modelUrl);
 
   } else if (shotIndex === 2) {
     // Shot 3: Lifestyle
